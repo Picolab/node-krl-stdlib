@@ -349,10 +349,10 @@ stdlib.duplicates = function(val){
   return r;
 };
 stdlib.randomWord = function(){
-return randomWords();
+  return randomWords();
 };
 stdlib.uuid = function(){
-return cuid();
+  return cuid();
 };
 
 stdlib.unique = _.uniq;
