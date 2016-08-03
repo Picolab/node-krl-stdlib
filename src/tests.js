@@ -124,6 +124,9 @@ test("String operators", function(t){
 
   tf("uc", ["loWer"], "LOWER");
 
+  tf("defaultsTo", ["string", "42", "testing defaultsTo [not logged]"], "string");
+  tf("defaultsTo", ["", "42", "testing defaultsTo [logged]"], "42");
+
   t.end();
 });
 

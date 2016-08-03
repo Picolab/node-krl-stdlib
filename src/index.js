@@ -182,6 +182,14 @@ stdlib.substr = function(val, start, len){
 stdlib.uc = function(val){
   return val.toUpperCase();
 };
+stdlib.defaultsTo = function(val,defaultVal,message){
+  if(_.size(val) === 0){
+    if(message !== undefined) console.log("[DEFAULTSTO]", message);
+    return defaultVal;
+  } else {
+    return val;
+  }
+};
 
 //Collection operators//////////////////////////////////////////////////////////
 stdlib.all = _.every;
