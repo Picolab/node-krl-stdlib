@@ -1,5 +1,6 @@
 var _ = require("lodash");
-
+var cuid = require("cuid");
+var randomWords = require("random-words");
 
 var stdlib = {};
 
@@ -57,17 +58,6 @@ defVarArgOp("%", function(r, a){
   return r % a;
 });
 
-stdlib["+"] = function(){
-  if(arguments.length === 0){
-    return;
-  }
-  var r = arguments[0];
-  var i;
-  for(i = 1; i < arguments.length; i++){
-    r = r + arguments[i];
-  }
-  return r;
-};
 stdlib.beesting = function(val){
   return val + "";
 };
@@ -347,6 +337,13 @@ stdlib.duplicates = function(val){
   });
   return r;
 };
+stdlib.randomWord = function(){
+  return randomWords();
+};
+stdlib.uuid = function(){
+  return cuid();
+};
+
 stdlib.unique = _.uniq;
 
 module.exports = stdlib;
