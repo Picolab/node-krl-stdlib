@@ -195,7 +195,7 @@ stdlib.uc = function(val){
 };
 stdlib.defaultsTo = function(val,defaultVal,message){
   if(_.size(val) === 0){
-    if(message !== undefined) console.log("[DEFAULTSTO]", message);
+    if(message !== undefined) stdlib.emitter.emit("debug", "[DEFAULTSTO]", message);
     return defaultVal;
   } else {
     return val;
