@@ -125,9 +125,6 @@ test("String operators", function(t){
 
   tf("uc", ["loWer"], "LOWER");
 
-  tf("defaultsTo", ["string", "42", "testing defaultsTo [not logged]"], "string");
-  tf("defaultsTo", ["", "42", "testing defaultsTo [logged]"], "42");
-
   t.end();
 });
 
@@ -313,4 +310,40 @@ test("klog", function(t){
     t.equals(message, "message 1");
   });
   stdlib.klog(42, "message 1");
+});
+
+test("defaultsTo - not needed", function(t){
+  t.plan(1);
+  var tl = function(){
+    t.equals(arguments.length,2);
+    t.equals(arguments[0],"[DEFAULTSTO]");
+    t.equals(arguments[1],"message 2");
+  };
+  stdlib.emitter.on("debug", tl);
+  t.equals(stdlib.defaultsTo("not needed",42,"message 2"),"not needed");
+  stdlib.emitter.removeListener("debug",tl);
+});
+
+test("defaultsTo - logging", function(t){
+  t.plan(4);
+  var tl = function(){
+    t.equals(arguments.length,2);
+    t.equals(arguments[0],"[DEFAULTSTO]");
+    t.equals(arguments[1],"message 2");
+  };
+  stdlib.emitter.on("debug", tl);
+  t.equals(stdlib.defaultsTo("",42,"message 2"),42);
+  stdlib.emitter.removeListener("debug",tl);
+});
+
+test("defaultsTo - no logging", function(t){
+  t.plan(1);
+  var tl = function(){
+    t.equals(arguments.length,2);
+    t.equals(arguments[0],"[DEFAULTSTO]");
+    t.equals(arguments[1],"message 2");
+  };
+  stdlib.emitter.on("debug", tl);
+  t.equals(stdlib.defaultsTo("",42),42);
+  stdlib.emitter.removeListener("debug",tl);
 });
