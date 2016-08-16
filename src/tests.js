@@ -45,6 +45,10 @@ test("general operators", function(t){
   assertThrows(t, stdlib.as, [NaN, "String"]);
   t.equals(stdlib.as("-1.23", "Number"), -1.23);
   t.equals(stdlib.as("^a.*z$", "RegExp").source, /^a.*z$/.source);
+  t.equals(stdlib.as(42, "Number"), 42);
+  t.equals(stdlib.as("str", "String"), "str");
+  var test_regex = /^a.*z$/;
+  t.equals(stdlib.as(test_regex, "RegExp"), test_regex);
 
   t.equals(stdlib.isnull(), true);
   t.equals(stdlib.isnull(void 0), true);
@@ -54,9 +58,6 @@ test("general operators", function(t){
   t.equals(stdlib.isnull(0), false);
   t.equals(stdlib.isnull(""), false);
   t.equals(stdlib.isnull({}), false);
-
-  t.ok(_.isFunction(stdlib.klog), "just checking that it's there");
-  t.equals(stdlib.klog(42,"log message for"),42);
 
   t.equals(stdlib["typeof"](""), "String");
   t.equals(stdlib["typeof"](0), "Number");
@@ -303,4 +304,13 @@ test("Random functions", function(t){
     t.ok(_.isString(stdlib.uuid()));
     t.notEquals(stdlib.uuid(),stdlib.uuid());
     t.end();
+});
+
+test("klog", function(t){
+  t.plan(2);
+  stdlib.emitter.on("klog", function(val, message){
+    t.equals(val, 42);
+    t.equals(message, "message 1");
+  });
+  stdlib.klog(42, "message 1");
 });
