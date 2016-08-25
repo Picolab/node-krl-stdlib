@@ -330,7 +330,11 @@ stdlib.values = function(val, path){
   return _.values(val);
 };
 stdlib.intersection = _.intersection;
-stdlib.union = (...args) => args.push(_.isEqual) && _.unionWith(...args);
+stdlib.union = function() {
+  var args = Array.prototype.slice.call(arguments);
+  args.push(_.isEqual);
+  return _.unionWith.apply(_, args);
+};
 stdlib.difference = _.difference;
 stdlib.has = function(val, other){
   return _.every(other, function(e){
