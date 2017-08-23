@@ -1,6 +1,7 @@
 var _ = require("lodash");
 var cocb = require("co-callback");
 var test = require("tape");
+var types = require("./types");
 var stdlib = require("./");
 
 var ylibFn = function(fn_name, args){
@@ -82,12 +83,12 @@ test("infix operators", function(t){
     tf("+", [-1], -1);
     tf("+", [1, 2], 3);
     tf("+", [2.3, .1], 2.4);
-    tf("+", [1, null], 1, "+ null is like + 0");
-    tf("+", [null, 1], 1, "+ null is like + 0");
-    tf("+", [1, false], 1, "+ false is like + 0");
-    tf("+", [false, 1], 1, "+ false is like + 0");
 
     //concat +
+    tf("+", [1, null], "1null");
+    tf("+", [null, 1], "null1");
+    tf("+", [1, false], "1false");
+    tf("+", [false, 1], "false1");
     tf("+", [_.noop, "foo"], "[Function]foo");
     tf("+", [1, true], "1true");
     tf("+", ["wat", 100], "wat100");
@@ -119,8 +120,8 @@ test("infix operators", function(t){
 
     tf("like", ["wat", /a/], true);
     tf("like", ["wat", /b/], false);
-    tf("like", ["wat"], null);
-    tf("like", ["wat", "da"], null);
+    tf("like", ["wat"], false);
+    tf("like", ["wat", "da"], false);
 
     tf("<=>", [5, 10], -1);
     tf("<=>", [5, 5], 0);
@@ -133,7 +134,7 @@ test("infix operators", function(t){
     tf("cmp", ["aab", "aab"], 0);
     tf("cmp", ["abb", "aab"], 1);
     tf("cmp", [NaN, void 0], 0);
-    tf("cmp", [null, "foo"], -1);
+    tf("cmp", [null, "foo"], 1);
     tf("cmp", ["foo", null], -1);
 
     t.end();
@@ -157,7 +158,7 @@ test("type operators", function(t){
     tf("as", [_.noop, "String"], "[Function]");
     tf("as", [[1,2], "String"], "[Array]");
     tf("as", [{}, "String"], "[Map]");
-    tf("as", [arguments, "String"], "[JSObject]");
+    tf("as", [arguments, "String"], "[Map]");
 
     tf("as", ["-1.23", "Number"], -1.23);
     tf("as", [42, "Number"], 42);
@@ -199,7 +200,24 @@ test("type operators", function(t){
     tf("typeof", [[]], "Array");
     tf("typeof", [{}], "Map");
     tf("typeof", [_.noop], "Function");
-    tf("typeof", [arguments], "JSObject");
+    tf("typeof", [arguments], "Map");
+
+    //special tests for Map detection
+    t.equals(types.isMap(null), false);
+    t.equals(types.isMap(void 0), false);
+    t.equals(types.isMap(NaN), false);
+    t.equals(types.isMap(_.noop), false);
+    t.equals(types.isMap(/a/i), false);
+    t.equals(types.isMap([1, 2]), false);
+    t.equals(types.isMap(new Array(2)), false);
+    t.equals(types.isMap("foo"), false);
+    t.equals(types.isMap(new String("bar")), false);
+    t.equals(types.isMap(10), false);
+    t.equals(types.isMap(new Number(10)), false);
+
+    t.equals(types.isMap({}), true);
+    t.equals(types.isMap({a: 1, b: 2}), true);
+    t.equals(types.isMap(arguments), true);
 
     var action = function(){};
     action.is_an_action = true;
@@ -230,7 +248,7 @@ test("string operators", function(t){
 
     tf("decode", ["[1,2,3]"], [1, 2, 3]);
     tf("decode", [[1,2,3]], [1, 2, 3], "if not a string, just return it");
-    tf("decode", [void 0], void 0, "if not a string, just return it");
+    tf("decode", [void 0], null, "if not a string, just return it (with the correct null)");
     tf("decode", ["[1,2"], "[1,2", "if parse fails, just return it");
     tf("decode", ["[1 2]"], "[1 2]", "if parse fails, just return it");
 
@@ -247,7 +265,7 @@ test("string operators", function(t){
     tf("match", ["3 + 2 - 1", /([0-9])/g], true);
     tf("match", ["no-match", /([0-9])/g], false);
 
-    tf("ord", [""], void 0);
+    tf("ord", [""], null);
     tf("ord", ["a"], 97);
     tf("ord", ["bill"], 98);
 
@@ -258,7 +276,7 @@ test("string operators", function(t){
     tf("substr", ["This is a string", 5], "is a string");
     tf("substr", ["This is a string", 5, 4], "is a");
     tf("substr", ["This is a string", 5, -5], "is a s");
-    tf("substr", ["This is a string", 25], void 0);
+    tf("substr", ["This is a string", 25], null);
 
     tf("uc", ["loWer"], "LOWER");
 
@@ -270,14 +288,14 @@ ytest("collection operators", function*(t, ytf, tf){
 
     var obj = {
         "colors": "many",
-        "pi": [3, 1, 4, 1, 5, 6, 9],
+        "pi": [3, 1, 4, 1, 5, 9, 3],
         "foo": {"bar": {"10": "I like cheese"}}
     };
     var obj2 = {"a": 1, "b": 2, "c": 3};
     var assertObjNotMutated = function(){
         t.deepEquals(obj, {
             "colors": "many",
-            "pi": [3, 1, 4, 1, 5, 6, 9],
+            "pi": [3, 1, 4, 1, 5, 9, 3],
             "foo": {"bar": {"10": "I like cheese"}}
         }, "should not be mutated");
         t.deepEquals(obj2, {"a": 1, "b": 2, "c": 3}, "should not be mutated");
@@ -327,7 +345,7 @@ ytest("collection operators", function*(t, ytf, tf){
 
     tf("head", [a], 3);
     t.deepEquals(a, [3, 4, 5], "should not be mutated");
-    tf("head", [[]], void 0);
+    tf("head", [[]], null);
 
     tf("tail", [a], [4, 5]);
     t.deepEquals(a, [3, 4, 5], "should not be mutated");
@@ -352,14 +370,14 @@ ytest("collection operators", function*(t, ytf, tf){
         "3a",
         "4b",
         "5c",
-        "undefinedd",
-        "undefinede",
-        "undefinedf",
+        "nulld",
+        "nulle",
+        "nullf",
     ]);
     t.deepEquals(a, [3, 4, 5], "should not be mutated");
 
     yield ytf("pairwise", [[[], []], function(l, r){return [l, r];}], []);
-    yield ytf("pairwise", [[[], [1]], function(l, r){return [l, r];}], [[void 0, 1]]);
+    yield ytf("pairwise", [[[], [1]], function(l, r){return [l, r];}], [[null, 1]]);
 
     yield ytf("reduce", [a, function(a,b){return a+b;}], 12);
     yield ytf("reduce", [a, function(a,b){return a+b;}, 10], 22);
@@ -376,7 +394,7 @@ ytest("collection operators", function*(t, ytf, tf){
     var vegies = ["corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"];
     tf("slice", [vegies, 1, 4], ["tomato","tomato","tomato","sprouts"]);
     tf("slice", [vegies, 2], ["corn","tomato","tomato"]);
-    tf("slice", [vegies, 14], void 0);
+    tf("slice", [vegies, 14], null);
     tf("slice", [vegies, 0, 0], ["corn"]);
 
     tf("splice", [vegies, 1, 4], ["corn","lettuce","sprouts"]);
@@ -399,7 +417,7 @@ ytest("collection operators", function*(t, ytf, tf){
 
     tf("delete", [obj, ["foo", "bar", 10]], {
         "colors": "many",
-        "pi": [3, 1, 4, 1, 5, 6, 9],
+        "pi": [3, 1, 4, 1, 5, 9, 3],
         "foo": {"bar": {}}//or "foo": {} ???
     });
     assertObjNotMutated();
@@ -415,7 +433,9 @@ ytest("collection operators", function*(t, ytf, tf){
     //use .as("String") rules for other types
     tf("encode", [_.noop], "\"[Function]\"");
     tf("encode", [/a/ig], "\"re#a#gi\"");
-    tf("encode", [arguments], "\"[JSObject]\"");
+    (function(){
+        tf("encode", [arguments], "{\"0\":\"a\",\"1\":\"b\"}");
+    }("a", "b"));
     //testing it nested
     tf("encode", [{fn: _.noop, n: NaN, u: void 0}], "{\"fn\":\"[Function]\",\"n\":null,\"u\":null}");
 
@@ -433,7 +453,7 @@ ytest("collection operators", function*(t, ytf, tf){
 
     tf("values", [obj], [
         "many",
-        [3, 1, 4, 1, 5, 6, 9],
+        [3, 1, 4, 1, 5, 9, 3],
         {"bar": {"10": "I like cheese"}}
     ]);
     tf("values", [obj, ["foo", "bar"]], ["I like cheese"]);
@@ -451,12 +471,12 @@ ytest("collection operators", function*(t, ytf, tf){
 
     tf("put", [obj, ["foo"], {baz: "qux"}], {
         "colors": "many",
-        "pi": [3, 1, 4, 1, 5, 6, 9],
+        "pi": [3, 1, 4, 1, 5, 9, 3],
         "foo": {"baz": "qux"},
     }, "overwrite at the path, even if to_set and curr val are both maps");
     tf("put", [obj, ["foo", "bar", 11], "wat?"], {
         "colors": "many",
-        "pi": [3, 1, 4, 1, 5, 6, 9],
+        "pi": [3, 1, 4, 1, 5, 9, 3],
         "foo": {
             "bar": {
                 "10": "I like cheese",
@@ -466,14 +486,14 @@ ytest("collection operators", function*(t, ytf, tf){
     });
     tf("put", [obj, ["foo", "bar", 10], "no cheese"], {
         "colors": "many",
-        "pi": [3, 1, 4, 1, 5, 6, 9],
+        "pi": [3, 1, 4, 1, 5, 9, 3],
         "foo": {
             "bar": {"10": "no cheese"},
         }
     });
     tf("put", [obj, {flop: 12}], {
         "colors": "many",
-        "pi": [3, 1, 4, 1, 5, 6, 9],
+        "pi": [3, 1, 4, 1, 5, 9, 3],
         "foo": {"bar": {"10": "I like cheese"}},
         "flop": 12
     });
@@ -575,7 +595,7 @@ ytest("collection operators", function*(t, ytf, tf){
 
     tf("set", [obj, ["foo", "baz"], "qux"], {
         "colors": "many",
-        "pi": [3, 1, 4, 1, 5, 6, 9],
+        "pi": [3, 1, 4, 1, 5, 9, 3],
         "foo": {
             "bar": {"10": "I like cheese"},
             "baz": "qux"
@@ -583,7 +603,7 @@ ytest("collection operators", function*(t, ytf, tf){
     });
     tf("set", [obj, "flop", 12], {
         "colors": "many",
-        "pi": [3, 1, 4, 1, 5, 6, 9],
+        "pi": [3, 1, 4, 1, 5, 9, 3],
         "foo": {
             "bar": {"10": "I like cheese"}
         },
@@ -591,14 +611,14 @@ ytest("collection operators", function*(t, ytf, tf){
     });
     tf("set", [obj, "colors", ["R", "G", "B"]], {
         "colors": ["R", "G", "B"],
-        "pi": [3, 1, 4, 1, 5, 6, 9],
+        "pi": [3, 1, 4, 1, 5, 9, 3],
         "foo": {
             "bar": {"10": "I like cheese"}
         }
     });
     tf("set", [obj, ["foo", "bar", "10"], "modified a sub object"], {
         "colors": "many",
-        "pi": [3, 1, 4, 1, 5, 6, 9],
+        "pi": [3, 1, 4, 1, 5, 9, 3],
         "foo": {
             "bar": {"10": "modified a sub object"}
         }
@@ -627,10 +647,10 @@ ytest("collection operators", function*(t, ytf, tf){
 test("klog", function(t){
     t.plan(3);
     stdlib.klog({
-        emit: function(kind, val, message){
+        emit: function(kind, obj){
             t.equals(kind, "klog");
-            t.equals(val, 42);
-            t.equals(message, "message 1");
+            t.equals(obj.val, 42);
+            t.equals(obj.message, "message 1");
         }
     }, 42, "message 1");
 });
@@ -651,12 +671,11 @@ test("defaultsTo - testing debug logging", function(t){
     t.equals(stdlib.defaultsTo(ctx, null, 42), 42, "no message to log");
     t.equals(stdlib.defaultsTo(ctx, null, 42, "message 2"), 42, "should emit debug");
     t.equals(stdlib.defaultsTo(ctx, null, 42, _.noop), 42, "message should use KRL toString rules");
-    t.equals(stdlib.defaultsTo(ctx, null, 42, NaN), 42, "message should use KRL toString rules");
+    t.equals(stdlib.defaultsTo(ctx, null, 42, NaN), 42, "no message to log");
 
     t.deepEquals(messages, [
         "[DEFAULTSTO] message 2",
         "[DEFAULTSTO] [Function]",//message should use KRL toString rules
-        "[DEFAULTSTO] null",//message should use KRL toString rules
     ]);
 
     t.end();

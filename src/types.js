@@ -15,7 +15,7 @@ types.isString = function(val){
 };
 
 types.isNumber = function(val){
-    return _.isNumber(val) && !_.isNaN(val);
+    return _.isFinite(val);
 };
 
 types.isRegExp = function(val){
@@ -27,7 +27,24 @@ types.isArray = function(val){
 };
 
 types.isMap = function(val){
-    return _.isPlainObject(val);
+    //Can't use _.isPlainObject b/c it's to restrictive on what is a "plain" object
+    //especially when accepting values from other libraries outside of KRL
+    return _.isObject(val)
+        && !_.isArray(val)
+        && !_.isFunction(val)
+        && !_.isRegExp(val)
+        && !_.isString(val)
+        && !_.isNumber(val)
+    ;
+};
+
+types.isArrayOrMap = function(val){
+    return _.isObject(val)
+        && !_.isFunction(val)
+        && !_.isRegExp(val)
+        && !_.isString(val)
+        && !_.isNumber(val)
+    ;
 };
 
 types.isFunction = function(val){
@@ -46,9 +63,9 @@ types.typeOf = function(val){
         "Number",
         "RegExp",
         "Array",
-        "Map",
         "Function",
         "Action",
+        "Map",
     ];
     var i;
     var type;
@@ -59,6 +76,39 @@ types.typeOf = function(val){
         }
     }
     return "JSObject";
+};
+
+var deepClean = function(val, mapFn){
+    return mapFn(val, function(v){
+        return types.cleanNulls(v);
+    });
+};
+
+//returns a clone of val with void 0 and NaN values converted to null
+types.cleanNulls = function(val){
+    if(types.isNull(val)){
+        return null;
+    }
+    if(types.isArray(val)){
+        return deepClean(val, _.map);
+    }
+    if(types.isMap(val)){
+        return deepClean(val, _.mapValues);
+    }
+    return val;
+};
+
+types.numericCast = function(val){
+    if(types.isNumber(val)){
+        return val;
+    }
+    if(!types.isString(val)){
+        return null;
+    }
+    var n = parseFloat(val);
+    return types.isNumber(n)
+        ? n
+        : null;
 };
 
 types.toString = function(val){
