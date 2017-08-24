@@ -35,47 +35,39 @@ var iterBase = function*(val, iter){
 
 // some guidelines/suggestions:
 // 0. effectively check arguments.length when not fixed by the grammar (and consider null versus omitted)
-// 1. convert NaN's/void 0's to nulls (if cleanNulls could possibly have an effect) for all return values and relevant arrays/maps
+// 1. convert NaN's/void 0's to nulls (if cleanNulls could possibly have an effect) for all return values and other relevant values
 // 2. don't mutate deep (array/map) arguments (cleanNulls doesn't, assignment can't)
-// 3. where strings/numbers/arrays are expected, convert to them when reasonable
+// 3. where strings/numbers/arrays are expected, convert to them when reasonable (don't coerce arrays to maps)
 // 4. prioritize errors on val's type (if applicable), then argument values/types/0. from left to right
 // 5. try to return the logical noop value (e.g. false, [], val (without 3.'s changes)) for missing or unrecoverably wrongly typed arguments
-// 6. the wiki's docs take precedence over the above
+// 6. don't worry about call stack limits when processing deep objects - Lodash is incorrect there too
+// 7. the wiki's docs take precedence over the above
 var stdlib = {};
 
 //Infix operators///////////////////////////////////////////////////////////////
+var ltEqGt = function(left, right){
+    if(types.typeOf(left) !== types.typeOf(right)){
+        return NaN; //unlike -1/0/1, comparisons with 0 are false
+    }
+    left = types.cleanNulls(left);
+    right = types.cleanNulls(right);
+    if(_.isEqual(left, right)){
+        return 0;
+    }
+    return (left > right) ? 1 : -1;
+};
 
 stdlib["<"] = function(ctx, left, right){
-    left = types.cleanNulls(left);
-    right = types.cleanNulls(right);
-    if(types.isArrayOrMap(left) && types.isArrayOrMap(right)){
-        return !_.isEqual(left, right) && [left, right].sort()[0] === left;
-    }
-    return left < right;
+    return ltEqGt(left, right) < 0;
 };
 stdlib[">"] = function(ctx, left, right){
-    left = types.cleanNulls(left);
-    right = types.cleanNulls(right);
-    if(types.isArrayOrMap(left) && types.isArrayOrMap(right)){
-        return !_.isEqual(left, right) && [left, right].sort()[0] === right;
-    }
-    return left > right;
+    return ltEqGt(left, right) > 0;
 };
 stdlib["<="] = function(ctx, left, right){
-    left = types.cleanNulls(left);
-    right = types.cleanNulls(right);
-    if(types.isArrayOrMap(left) && types.isArrayOrMap(right)){
-        return _.isEqual(left, right) || [left, right].sort()[0] === left;
-    }
-    return left <= right;
+    return ltEqGt(left, right) <= 0;
 };
 stdlib[">="] = function(ctx, left, right){
-    left = types.cleanNulls(left);
-    right = types.cleanNulls(right);
-    if(types.isArrayOrMap(left) && types.isArrayOrMap(right)){
-        return _.isEqual(left, right) || [left, right].sort()[0] === right;
-    }
-    return left >= right;
+    return ltEqGt(left, right) >= 0;
 };
 stdlib["=="] = function(ctx, left, right){
     left = types.cleanNulls(left);
@@ -163,28 +155,22 @@ stdlib.like = function(ctx, val, regex){
     return regex.test(types.toString(val));
 };
 
-//left and right are already null-cleaned
-var ltEqGt = function(ctx, left, right){
-    if(_.isEqual(left, right)){
-        return 0;
-    }
-    if(types.isArrayOrMap(left) && types.isArrayOrMap(right)){
-        return [left, right].sort()[0] === right
-            ? 1
-            : -1;
-    }
-    return (left > right) ? 1 : -1;
-};
 stdlib["<=>"] = function(ctx, left, right){
     var leftNumber = types.numericCast(left);
     var rightNumber = types.numericCast(right);
-    if(leftNumber === null || rightNumber === null){
-        return ltEqGt(ctx, types.cleanNulls(left), types.cleanNulls(right));
+    if(leftNumber !== null && rightNumber !== null){
+        return ltEqGt(leftNumber, rightNumber);
     }
-    return ltEqGt(ctx, leftNumber, rightNumber);
+    var result = ltEqGt(left, right);
+    if(_.isNaN(result)){
+        throw new TypeError("The <=> operator cannot compare non-numbers of different types");
+    }
+    return result;
 };
 stdlib.cmp = function(ctx, left, right){
-    return ltEqGt(ctx, types.toString(left), types.toString(right));
+    var leftStr = types.toString(left);
+    var rightStr = types.toString(right);
+    return ltEqGt(leftStr, rightStr);
 };
 
 stdlib.beesting = function(ctx, val){
@@ -450,6 +436,7 @@ stdlib.none = function*(ctx, val, iter){
 stdlib.append = function(ctx, val, others){
     return _.concat.apply(void 0, types.cleanNulls(_.tail(_.toArray(arguments))));
 };
+// works for arrays (documented) and maps (undocumented)
 stdlib.collect = function*(ctx, val, iter){
     if(!types.isFunction(iter)){
         return {};
@@ -757,7 +744,7 @@ var isSafeArrayIndex = function(arr, key){
 
 stdlib.put = function(ctx, val, path, to_set){
     val = types.cleanNulls(val);
-    if(!types.isArrayOrMap(val) || arguments.length < 3){
+    if(!types.isMap(val) || arguments.length < 3){
         return val;
     }
     if(arguments.length < 4){

@@ -74,7 +74,16 @@ var ytest = function(msg, body){
         cocb.run(body(t, ytf, tf), t.end);
     });
 };
-
+//use a fuzzer instead?
+var tfMatrix = function(tf, args, exp){
+    var i;
+    for(i=0; i < exp.length; i++){
+        var j;
+        for(j=0; j < args.length; j++){
+            tf(exp[i][0], args[j], exp[i][j+1]);
+        }
+    }
+};
 
 test("infix operators", function(t){
     var tf = _.partial(testFn, t);
@@ -96,10 +105,28 @@ test("infix operators", function(t){
 
     tf("-", [1, 3], -2);
     tf("-", [4, 1], 3);
-    tf("-", [2], -2);
+    tf("-", [2], -2);//t15
 
-    tf("<", [1, 3], true);
-    tf("<", [3, 1], false);
+    tfMatrix(tf, [
+        [2, 10],              // 1
+        [6, 6],               // 2
+        [10, 2],              // 3
+        ["2", "10"],          // 4
+        ["6", "6"],           // 5
+        ["10", "2"],          // 6
+        [NaN, null],          // 7
+        [["a", 0], ["a", 0]], // 8
+        [{"a": 0}, {"a": 0}], // 9
+        [["a", 0], ["b", 1]], // 10
+        [{"a": 1}, {"b": 0}], // 11
+    ], [        // 1      2      3      4      5      6      7      8      9     10     11
+        ["<",   true, false, false, false, false,  true, false, false, false, false, false],///FIX
+        [">",  false, false,  true,  true, false, false, false, false, false, false, false],
+        ["<=",  true,  true, false, false,  true,  true,  true,  true,  true, false, false],
+        [">=", false,  true,  true,  true,  true, false,  true,  true,  true, false, false],
+        ["==", false,  true, false, false,  true, false,  true,  true,  true, false, false],
+        ["!=",  true, false,  true,  true, false,  true, false, false, false,  true,  true],
+    ]);
 
     tf("*", [5, 2], 10);
     tf("/", [4, 2], 2);
