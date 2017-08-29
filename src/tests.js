@@ -24,10 +24,9 @@ var ylibFn = function(fn_name, args){
 var defaultCTX = {
     emit: _.noop
 };
-
-var testFn = function(t, fn, args, expected, message){
-    //wrap lambdas as KRL Closures
-    args = _.map(args, function(arg){
+//wrap lambdas as KRL Closures
+var mkClosure = function(args){
+    return _.map(args, function(arg){
         if(_.isFunction(arg)){
             return function(ctx, args){
                 return arg.apply(this, args);
@@ -35,7 +34,36 @@ var testFn = function(t, fn, args, expected, message){
         }
         return arg;
     });
-    t.deepEquals(stdlib[fn].apply(null, [defaultCTX].concat(args)), expected, message);
+};
+
+var testFn = function(t, fn, args, expected, emitType, errType, message){
+    if(arguments.length === 5){
+        message = emitType;
+        emitType = void 0;
+    }
+
+    var mkCtx = function(emitType, errType){
+        return {
+            emit: function(kind, err){
+                t.equals(kind, emitType);
+                t.equals(err.name, errType);
+            }
+        };
+    };
+
+    args = mkClosure(args);
+    var emitCTX = mkCtx(emitType, errType);
+    t.deepEquals(stdlib[fn].apply(null, [emitCTX].concat(args)), expected, message);
+};
+
+var testFnErr = function(t, fn, args, type){
+    args = mkClosure(args);
+    try{
+        stdlib[fn].apply(null, [defaultCTX].concat(args));
+        t.fail("Failed to throw an error");
+    }catch(err){
+        t.equals(err.name, type);
+    }
 };
 
 var mkTf = function(t){
@@ -70,8 +98,9 @@ var mkTf = function(t){
 var ytest = function(msg, body){
     test(msg, function(t){
         var tf = _.partial(testFn, t);
+        var tfe = _.partial(testFnErr, t);
         var ytf = mkTf(t);
-        cocb.run(body(t, ytf, tf), t.end);
+        cocb.run(body(t, ytf, tfe, tf), t.end);
     });
 };
 //use a fuzzer instead?
@@ -104,8 +133,12 @@ test("infix operators", function(t){
     tf("+", [{}, []], "[Map][Array]");
 
     tf("-", [1, 3], -2);
-    tf("-", [4, 1], 3);
-    tf("-", [2], -2);//t15
+    tf("-", ["1", 3], -2);
+    tf("-", [4, "1"], 3);
+    tf("-", ["4", "1"], 3);
+    tf("-", [2], -2);
+    tf("-", ["-2"], 2);
+    //use t.throws replacement once written
 
     tfMatrix(tf, [
         [2, 10],              // 1
@@ -120,7 +153,7 @@ test("infix operators", function(t){
         [["a", 0], ["b", 1]], // 10
         [{"a": 1}, {"b": 0}], // 11
     ], [        // 1      2      3      4      5      6      7      8      9     10     11
-        ["<",   true, false, false, false, false,  true, false, false, false, false, false],///FIX
+        ["<",   true, false, false, false, false,  true, false, false, false, false, false],
         [">",  false, false,  true,  true, false, false, false, false, false, false, false],
         ["<=",  true,  true, false, false,  true,  true,  true,  true,  true, false, false],
         [">=", false,  true,  true,  true,  true, false,  true,  true,  true, false, false],
@@ -154,15 +187,11 @@ test("infix operators", function(t){
     tf("<=>", [5, 5], 0);
     tf("<=>", [10, 5], 1);
     tf("<=>", [NaN, void 0], 0);
-    tf("<=>", [null, 10], -1);
-    tf("<=>", [10, null], +1);
 
     tf("cmp", ["aab", "abb"], -1);
     tf("cmp", ["aab", "aab"], 0);
     tf("cmp", ["abb", "aab"], 1);
     tf("cmp", [NaN, void 0], 0);
-    tf("cmp", [null, "foo"], 1);
-    tf("cmp", ["foo", null], -1);
 
     t.end();
 });
@@ -310,7 +339,7 @@ test("string operators", function(t){
     t.end();
 });
 
-ytest("collection operators", function*(t, ytf, tf){
+ytest("collection operators", function*(t, ytf, tfe, tf){
     var a = [3, 4, 5];
 
     var obj = {
@@ -421,8 +450,9 @@ ytest("collection operators", function*(t, ytf, tf){
     var vegies = ["corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"];
     tf("slice", [vegies, 1, 4], ["tomato","tomato","tomato","sprouts"]);
     tf("slice", [vegies, 2], ["corn","tomato","tomato"]);
-    tf("slice", [vegies, 14], null);
     tf("slice", [vegies, 0, 0], ["corn"]);
+    tf("slice", [[], -1], null, "error", "Error");
+    tf("slice", [vegies, 14], null, "error", "RangeError");
 
     tf("splice", [vegies, 1, 4], ["corn","lettuce","sprouts"]);
     tf("splice", [vegies, 2, 0, ["corn", "tomato"]], ["corn","tomato","corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"]);

@@ -47,12 +47,15 @@ var stdlib = {};
 //Infix operators///////////////////////////////////////////////////////////////
 var ltEqGt = function(left, right){
     if(types.typeOf(left) !== types.typeOf(right)){
-        return NaN; //unlike -1/0/1, comparisons with 0 are false
+        return NaN; // unlike -1/0/1, all comparisons with 0 are false
     }
     left = types.cleanNulls(left);
     right = types.cleanNulls(right);
     if(_.isEqual(left, right)){
         return 0;
+    }
+    if(types.isArrayOrMap(left)){
+        return NaN; // don't compare unequal arrays or maps
     }
     return (left > right) ? 1 : -1;
 };
@@ -744,7 +747,7 @@ var isSafeArrayIndex = function(arr, key){
 
 stdlib.put = function(ctx, val, path, to_set){
     val = types.cleanNulls(val);
-    if(!types.isMap(val) || arguments.length < 3){
+    if(!types.isArrayOrMap(val) || arguments.length < 3){
         return val;
     }
     if(arguments.length < 4){
