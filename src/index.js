@@ -39,7 +39,7 @@ var iterBase = function*(val, iter){
 // 2. don't mutate deep (array/map) arguments (cleanNulls doesn't, assignment can't)
 // 3. where strings/numbers/arrays are expected, convert to them when reasonable (don't coerce arrays to maps)
 // 4. prioritize errors on val's type (if applicable), then argument values/types/0. from left to right
-// 5. try to return the logical noop value (e.g. false, [], val (without 3.'s changes)) for missing or unrecoverably wrongly typed arguments
+// 5. try to return the logical noop value (e.g. false, [], val (unchanged by 3.)) for missing or unrecoverably wrongly typed arguments
 // 6. don't worry about call stack limits when processing deep objects - Lodash is incorrect there too
 // 7. the wiki's docs take precedence over the above
 var stdlib = {};
@@ -98,7 +98,7 @@ stdlib["-"] = function(ctx, left, right){
         if(leftNumber === null){
             throw new TypeError("Cannot negate " + types.toString(left));
         }
-        return -types.cleanNulls(left);
+        return -types.cleanNulls(leftNumber);
     }
     var rightNumber = types.numericCast(right);
     if(leftNumber === null || rightNumber === null){
@@ -150,10 +150,8 @@ stdlib["><"] = function(ctx, obj, val){
 };
 
 stdlib.like = function(ctx, val, regex){
-    if(types.isString(regex)){
-        regex = new RegExp(regex);
-    }else if(!types.isRegExp(regex)){
-        return false;
+    if(!types.isRegExp(regex)){
+        regex = new RegExp(types.toString(regex));
     }
     return regex.test(types.toString(val));
 };
@@ -166,7 +164,7 @@ stdlib["<=>"] = function(ctx, left, right){
     }
     var result = ltEqGt(left, right);
     if(_.isNaN(result)){
-        throw new TypeError("The <=> operator cannot compare non-numbers of different types");
+        throw new TypeError("The <=> operator will not compare " + types.toString(left) + " with " + types.toString(right));
     }
     return result;
 };
@@ -186,7 +184,7 @@ stdlib.beesting = function(ctx, val){
 //
 stdlib.as = function(ctx, val, type){
     if(arguments.length < 3){
-        throw new Error("The .as() operator needs a type string");
+        return types.cleanNulls(val);
     }
     var val_type = types.typeOf(val);
     if(val_type === type){
@@ -362,7 +360,7 @@ stdlib.replace = function(ctx, val, regex, replacement){
 };
 stdlib.split = function(ctx, val, split_on){
     val = types.toString(val);
-    split_on = types.cleanNulls(split_on);
+    split_on = types.cleanNulls(split_on); // toString?
     return val.split(split_on);
 };
 stdlib.substr = function(ctx, val, start, len){
@@ -412,7 +410,7 @@ stdlib.all = function*(ctx, val, iter){
     return !broke;
 };
 stdlib.notall = function*(ctx, val, iter){
-    return !(yield* stdlib.all(ctx, val, iter));
+    return !(yield stdlib.all(ctx, val, iter)); // works b/c of co library
 };
 stdlib.any = function*(ctx, val, iter){
     if(!types.isFunction(iter)){
@@ -434,7 +432,7 @@ stdlib.any = function*(ctx, val, iter){
     return broke;
 };
 stdlib.none = function*(ctx, val, iter){
-    return !(yield* stdlib.any(ctx, val, iter));
+    return !(yield stdlib.any(ctx, val, iter));
 };
 stdlib.append = function(ctx, val, others){
     return _.concat.apply(void 0, types.cleanNulls(_.tail(_.toArray(arguments))));
@@ -495,6 +493,9 @@ stdlib.tail = function(ctx, val){
     return types.cleanNulls(_.tail(val));
 };
 stdlib.index = function(ctx, val, elm){
+    if(arguments.length < 3){
+        return -1;
+    }
     val = types.cleanNulls(val);
     elm = types.cleanNulls(elm);
     if(!types.isArray(val)){
