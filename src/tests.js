@@ -185,6 +185,17 @@ test("infix operators", function(t){
     tfe("-", ["two", 1], "TypeError");
     tfe("-", [[], "-1"], "TypeError");
 
+    tf("==", [null, NaN], true);
+    tf("==", [NaN, void 0], true);
+    tf("==", [null, void 0], true);
+    tf("==", [NaN, NaN], true);
+    tf("==", [null, 0], false);
+    tf("==", [0, null], false);
+    tf("==", [0, void 0], false);
+    tf("==", [0, NaN], false);
+    tf("==", [false, null], false);
+    tf("==", [true, 1], false);
+
     tfMatrix(tf, [
         [2, 10],              // 1
         [6, 6],               // 2
