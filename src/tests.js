@@ -37,7 +37,7 @@ action.is_an_action = true;
 //wrap lambdas as KRL Closures
 var mkClosure = function(args){
     return _.map(args, function(arg){
-        if(_.isFunction(arg)){
+        if(types.isFunction(arg)){
             return function(ctx, args){
                 return arg.apply(this, args);
             };
@@ -375,8 +375,8 @@ test("string operators", function(t){
     tf("capitalize", [" l"], " l");
 
     tf("decode", ["[1,2,3]"], [1, 2, 3]);
-    tf("decode", [[1, 2, NaN]], [1, 2, null], "if not a string, return it (with the correct null)");
-    tf("decode", [void 0], null, "if not a string, just return it (with the correct null)");
+    tf("decode", [[1, 2, NaN]], [1, 2, null], "if not a string, return it (with the correct nulls)");
+    tf("decode", [void 0], null, "if not a string, just return it (with the correct nulls)");
     tf("decode", ["[1,2"], "[1,2", "if parse fails, just return it");
     tf("decode", ["[1 2]"], "[1 2]", "if parse fails, just return it");
 
@@ -583,7 +583,7 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     t.ok(types.isAction(action), "should not be mutated");
     yield ytf("map", [c, fnDontCall], []);
     deepEquals(c, [], "should not be mutated");
-    yield ytf("map", ["012", function(x){return x + "1";}], ["0121"], "strings are not character arrays");
+    yield ytf("map", ["012", function(x){return x + "1";}], ["0121"], "KRL strings are not arrays");
 
     yield ytf("map", [{}, fnDontCall], {});
     yield ytf("map", [obj2, function(v, k){return v + k;}], {"a":"1a", "b":"2b","c":"3c"});
@@ -606,308 +606,347 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     yield ytfe("pairwise", [[[]], fnDontCall], "TypeError");
     yield ytfe("pairwise", [[[], []]], "Error");
     yield ytfe("pairwise", [[[], []], action], "TypeError");
-    //
-    //    yield ytf("reduce", [a, function(a,b){return a+b;}], 12);
-    //    yield ytf("reduce", [a, function(a,b){return a+b;}, 10], 22);
-    //    yield ytf("reduce", [a, function(a,b){return a-b;}], -6);
-    //    deepEquals(a, [3, 4, 5], "should not be mutated");
-    //    yield ytf("reduce", [[], function(a,b){return a+b;}], 0);
-    //    yield ytf("reduce", [[], function(a,b){return a+b;}, 15], 15);
-    //    yield ytf("reduce", [[76], function(a,b){return a+b;}], 76);
-    //    yield ytf("reduce", [[76], function(a,b){return a+b;}, 15], 91);
-    //
-    //    tf("reverse", [a], [5, 4, 3]);
-    //    deepEquals(a, [3, 4, 5], "should not be mutated");
-    //
-    //    var vegies = ["corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"];
-    //    tf("slice", [vegies, 1, 4], ["tomato","tomato","tomato","sprouts"]);
-    //    tf("slice", [vegies, 2], ["corn","tomato","tomato"]);
-    //    tf("slice", [vegies, 0, 0], ["corn"]);
-    //    tf("slice", [[], -1], null, "error", "Error");
-    //    tf("slice", [vegies, 14], null, "error", "RangeError");
-    //
-    //    tf("splice", [vegies, 1, 4], ["corn","lettuce","sprouts"]);
-    //    tf("splice", [vegies, 2, 0, ["corn", "tomato"]], ["corn","tomato","corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"]);
-    //    tf("splice", [vegies, 2, 0, "liver"], ["corn","tomato","liver","tomato","tomato","sprouts","lettuce","sprouts"]);
-    //    tf("splice", [vegies, 2, 2, "liver"], ["corn","tomato","liver","sprouts","lettuce","sprouts"]);
-    //    tf("splice", [vegies, 1, 10], ["corn"]);
-    //    tf("splice", [vegies, 1, 10, "liver"], ["corn", "liver"]);
-    //    deepEquals(vegies, ["corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"], "should not be mutated");
-    //
-    //    var to_sort = [5, 3, 4, 1, 12];
-    //    yield ytf("sort", [to_sort], [1, 12, 3, 4, 5]);
-    //    yield ytf("sort", [to_sort, "reverse"], [5, 4, 3, 12, 1]);
-    //    yield ytf("sort", [to_sort, "numeric"], [1, 3, 4, 5, 12]);
-    //    yield ytf("sort", [to_sort, "ciremun"], [12, 5, 4, 3, 1]);
-    //    yield ytf("sort", [to_sort, function(a, b){
-    //        return a < b ? -1 : (a === b ? 0 : 1);
-    //    }], [1, 3, 4, 5, 12]);
-    //    deepEquals(to_sort, [5, 3, 4, 1, 12], "should not be mutated");
-    //
-    //    tf("delete", [obj, ["foo", "bar", 10]], {
-    //        "colors": "many",
-    //        "pi": [3, 1, 4, 1, 5, 9, 3],
-    //        "foo": {"bar": {}}//or "foo": {} ???
-    //    });
-    //    assertObjNotMutated();
-    //
-    //    tf("encode", [{blah: 1}], "{\"blah\":1}");
-    //    tf("encode", [[1, 2]], "[1,2]");
-    //    tf("encode", [12], "12");
-    //    tf("encode", ["12"], "\"12\"");
-    //    //all nulls are treated the same
-    //    tf("encode", [null], "null");
-    //    tf("encode", [NaN], "null");
-    //    tf("encode", [void 0], "null");
-    //    //use .as("String") rules for other types
-    //    tf("encode", [_.noop], "\"[Function]\"");
-    //    tf("encode", [/a/ig], "\"re#a#gi\"");
-    //    (function(){
-    //        tf("encode", [arguments], "{\"0\":\"a\",\"1\":\"b\"}");
-    //    }("a", "b"));
-    //    //testing it nested
-    //    tf("encode", [{fn: _.noop, n: NaN, u: void 0}], "{\"fn\":\"[Function]\",\"n\":null,\"u\":null}");
-    //
-    //    //testing indent options
-    //    tf("encode", [{a: 1, b: 2}, 0], "{\"a\":1,\"b\":2}");
-    //    tf("encode", [{a: 1, b: 2}, 4], "{\n    \"a\": 1,\n    \"b\": 2\n}");
-    //    tf("encode", [{a: 1, b: 2}, "2"], "{\n  \"a\": 1,\n  \"b\": 2\n}");
-    //    tf("encode", [{a: 1, b: 2}, null], "{\"a\":1,\"b\":2}", "default indent to 0");
-    //    tf("encode", [{a: 1, b: 2}, arguments], "{\"a\":1,\"b\":2}", "default indent to 0");
-    //    tf("encode", [{a: 1, b: 2}, _.noop], "{\"a\":1,\"b\":2}", "default indent to 0");
-    //
-    //    tf("keys", [obj], ["colors", "pi", "foo"]);
-    //    tf("keys", [obj, ["foo", "bar"]], ["10"]);
-    //    assertObjNotMutated();
-    //
-    //    tf("values", [obj], [
-    //        "many",
-    //        [3, 1, 4, 1, 5, 9, 3],
-    //        {"bar": {"10": "I like cheese"}}
-    //    ]);
-    //    tf("values", [obj, ["foo", "bar"]], ["I like cheese"]);
-    //    assertObjNotMutated();
-    //
-    //    tf("put", [{key: 5}, {foo: "bar"}], {key: 5, foo: "bar"});
-    //    tf("put", [{key: 5}, [], {foo: "bar"}], {key: 5, foo: "bar"});
-    //    tf("put", [{key: 5}, ["baz"], {foo: "bar"}], {key: 5, baz: {foo: "bar"}});
-    //    tf("put", [{key: 5}, ["qux"], "wat?"], {key: 5, qux: "wat?"});
-    //    tf("put", [{key: 5}, [null], "wat?"], {key: 5, "null": "wat?"});
-    //    tf("put", [{key: 5}, [void 0], "wat?"], {key: 5, "null": "wat?"});
-    //    tf("put", [{key: 5}, [void 0], "wat?"], {key: 5, "null": "wat?"});
-    //    tf("put", [{key: 5}, [NaN], "wat?"], {key: 5, "null": "wat?"});
-    //    tf("put", [{key: 5}, [_.noop], "wat?"], {key: 5, "[Function]": "wat?"});
-    //
-    //    tf("put", [obj, ["foo"], {baz: "qux"}], {
-    //        "colors": "many",
-    //        "pi": [3, 1, 4, 1, 5, 9, 3],
-    //        "foo": {"baz": "qux"},
-    //    }, "overwrite at the path, even if to_set and curr val are both maps");
-    //    tf("put", [obj, ["foo", "bar", 11], "wat?"], {
-    //        "colors": "many",
-    //        "pi": [3, 1, 4, 1, 5, 9, 3],
-    //        "foo": {
-    //            "bar": {
-    //                "10": "I like cheese",
-    //                "11": "wat?",
-    //            },
-    //        }
-    //    });
-    //    tf("put", [obj, ["foo", "bar", 10], "no cheese"], {
-    //        "colors": "many",
-    //        "pi": [3, 1, 4, 1, 5, 9, 3],
-    //        "foo": {
-    //            "bar": {"10": "no cheese"},
-    //        }
-    //    });
-    //    tf("put", [obj, {flop: 12}], {
-    //        "colors": "many",
-    //        "pi": [3, 1, 4, 1, 5, 9, 3],
-    //        "foo": {"bar": {"10": "I like cheese"}},
-    //        "flop": 12
-    //    });
-    //    assertObjNotMutated();
-    //    tf("put", [{}, ["key1"], "value2"], {key1: "value2"});
-    //    tf("put", [{}, [], {key2: "value3"}], {key2: "value3"});
-    //    tf("put", [{key: 5}, "foo", {key2: "value3"}], {key: 5, "foo": {key2: "value3"}});
-    //    tf("put", [{key: 5}, "key", 7], {key: 7});
-    //    tf("put", [{key: 5}, ["key"], 9], {key: 9});
-    //
-    //    tf("put", [5, ["key"], 9], 5, "if val is not a Map or Array, return the val");
-    //    tf("put", ["wat", ["key"], 9], "wat", "if val is not a Map or Array, return the val");
-    //    tf("put", [null, ["key"], 9], null, "if val is not a Map or Array, return the val");
-    //
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, {}, ["0", "0"], "foo")),
-    //        "{\"0\":{\"0\":\"foo\"}}",
-    //        "don't use arrays by default, i.e. don't do {\"0\":[\"foo\"]}"
-    //    );
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, {}, [0, 1], "foo")),
-    //        "{\"0\":{\"1\":\"foo\"}}",
-    //        "don't do {\"0\":[null,\"foo\"]}"
-    //    );
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, [], [0, 0], "foo")),
-    //        "[{\"0\":\"foo\"}]"
-    //    );
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, [["wat?"]], [0, 0], "foo")),
-    //        "[[\"foo\"]]",
-    //        "if the nested value is an array, keep it an array"
-    //    );
-    //
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, {}, ["a", "b"], [])),
-    //        "{\"a\":{\"b\":[]}}",
-    //        "preserve type of to_set"
-    //    );
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, [], [0], ["foo"])),
-    //        "[[\"foo\"]]",
-    //        "preserve type of to_set"
-    //    );
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, [], [], ["foo"])),
-    //        "[\"foo\"]",
-    //        "preserve type of to_set"
-    //    );
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, {}, "foo", [0])),
-    //        "{\"foo\":[0]}",
-    //        "preserve type of to_set"
-    //    );
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, {}, "foo", ["bar"])),
-    //        "{\"foo\":[\"bar\"]}",
-    //        "preserve type of to_set"
-    //    );
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, [{foo: 1}, {bar: 2}], [1, "bar", "baz"], 4)),
-    //        "[{\"foo\":1},{\"bar\":{\"baz\":4}}]"
-    //    );
-    //
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, {one: [2, 3]}, ["one", 1], 4)),
-    //        "{\"one\":[2,4]}",
-    //        "number index"
-    //    );
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, {one: [2, 3]}, ["one", "1"], 4)),
-    //        "{\"one\":[2,4]}",
-    //        "Array index can be a string"
-    //    );
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, {one: [2, 3]}, ["one", "2"], 4)),
-    //        "{\"one\":[2,3,4]}",
-    //        "Array index at the end"
-    //    );
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, {one: [2, 3]}, ["one", "3"], 4)),
-    //        "{\"one\":{\"0\":2,\"1\":3,\"3\":4}}",
-    //        "convert Array to Map if sparse array is attempted"
-    //    );
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, {one: [2, 3]}, ["one", "foo"], 4)),
-    //        "{\"one\":{\"0\":2,\"1\":3,\"foo\":4}}",
-    //        "convert Array to Map if non-index path is given"
-    //    );
-    //    t.equals(
-    //        JSON.stringify(stdlib["put"](defaultCTX, {one: [2, 3]}, ["one", "foo", "0"], 4)),
-    //        "{\"one\":{\"0\":2,\"1\":3,\"foo\":{\"0\":4}}}",
-    //        "convert Array to Map if non-index path is given"
-    //    );
-    //
-    //    tf("get", [obj, ["foo", "bar", "10"]], "I like cheese");
-    //    tf("get", [obj, "colors"], "many");
-    //    assertObjNotMutated();
-    //
-    //    tf("set", [obj, ["foo", "baz"], "qux"], {
-    //        "colors": "many",
-    //        "pi": [3, 1, 4, 1, 5, 9, 3],
-    //        "foo": {
-    //            "bar": {"10": "I like cheese"},
-    //            "baz": "qux"
-    //        }
-    //    });
-    //    tf("set", [obj, "flop", 12], {
-    //        "colors": "many",
-    //        "pi": [3, 1, 4, 1, 5, 9, 3],
-    //        "foo": {
-    //            "bar": {"10": "I like cheese"}
-    //        },
-    //        "flop": 12
-    //    });
-    //    tf("set", [obj, "colors", ["R", "G", "B"]], {
-    //        "colors": ["R", "G", "B"],
-    //        "pi": [3, 1, 4, 1, 5, 9, 3],
-    //        "foo": {
-    //            "bar": {"10": "I like cheese"}
-    //        }
-    //    });
-    //    tf("set", [obj, ["foo", "bar", "10"], "modified a sub object"], {
-    //        "colors": "many",
-    //        "pi": [3, 1, 4, 1, 5, 9, 3],
-    //        "foo": {
-    //            "bar": {"10": "modified a sub object"}
-    //        }
-    //    });
-    //    assertObjNotMutated();
-    //
-    //    tf("intersection", [[2, 1], [2, 3]], [2]);
-    //
-    //    tf("union", [[2], [1, 2]], [2, 1]);
-    //    tf("union", [[1, 2], [1, 4]], [1, 2, 4]);
-    //    tf("union", [[{"x":2}], [{"x":1}, {"x":2}]], [{"x":2}, {"x":1}]);
-    //
-    //    tf("difference", [[2, 1], [2, 3]], [1]);
-    //    tf("difference", [[{"x":2}, {"x":1}], [{"x":2}, {"x":3}]], [{"x":1}]);
-    //
-    //    tf("has", [[1, 2, 3, 4], [4, 2]], true);
-    //    tf("has", [[1, 2, 3, 4], [4, 5]], false);
-    //
-    //    tf("once", [[1, 2, 1, 3, 4, 4]], [2, 3]);
-    //
-    //    tf("duplicates", [[1, 2, 1, 3, 4, 4]], [1, 4]);
-    //
-    //    tf("unique", [[1, 2, 1, 3, 4, 4]], [1, 2, 3, 4]);
+
+    yield ytf("reduce", [a, function(a,b){return a+b;}], 12);
+    yield ytf("reduce", [a, function(a,b){return a+b;}, 10], 22);
+    yield ytf("reduce", [a, function(a,b){return a-b;}], -6);
+    deepEquals(a, [3, 4, 5], "should not be mutated");
+    yield ytf("reduce", [[], fnDontCall], 0);
+    yield ytf("reduce", [[], fnDontCall, void 0], null);
+    yield ytf("reduce", [76, fnDontCall], 76);
+    yield ytf("reduce", [null, function(a,b){return a+b;}, "76"], "76null");
+
+    tf("reverse", [a], [5, 4, 3]);
+    deepEquals(a, [3, 4, 5], "should not be mutated");
+    tf("reverse", ["not an array"], "not an array");
+
+    var veggies = ["corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"];
+    tf("slice", [veggies, 1, 4], ["tomato","tomato","tomato","sprouts"]);
+    tf("slice", [veggies, 2, 0], ["corn","tomato","tomato"]);
+    tf("slice", [veggies, 2], ["corn","tomato","tomato"]);
+    tf("slice", [veggies, 0, 0], ["corn"]);
+    tf("slice", [{"0": "0"}, 0, 0], [{"0": "0"}]);
+    tf("slice", [[], _.noop], null, "error", "Error");
+    tfe("slice", [veggies, _.noop], "TypeError");
+    tfe("slice", [veggies, 1, _.noop], "TypeError");
+    tfe("slice", [veggies, -1, _.noop], "TypeError");
+    tf("slice", [veggies, 14], null, "error", "RangeError");
+    tf("slice", [veggies, 2, -1], null, "error", "RangeError");
+    deepEquals(veggies, ["corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"], "should not be mutated");
+
+    tf("splice", [veggies, 1, 4], ["corn","lettuce","sprouts"]);
+    tf("splice", [veggies, 2, 0, ["corn", "tomato"]], ["corn","tomato","corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"]);
+    tf("splice", [veggies, 2, 0, "liver"], ["corn","tomato","liver","tomato","tomato","sprouts","lettuce","sprouts"]);
+    tf("splice", [veggies, 2, 2, "liver"], ["corn","tomato","liver","sprouts","lettuce","sprouts"]);
+    tf("splice", [veggies, 1, 10], ["corn"]);
+    tf("splice", [veggies, 1, 10, "liver"], ["corn", "liver"]);
+    tf("splice", [veggies, 1, 10, []], ["corn"]);
+    tfe("splice", [[], NaN], "Error");
+    tfe("splice", [void 0, NaN, []], "TypeError");
+    tfe("splice", [void 0, -1, []], "RangeError");
+    tfe("splice", [veggies, 7, []], "RangeError");
+    tfe("splice", [veggies, 6, []], "TypeError");
+    tf("splice", [void 0, 0, 0, []], [null]);
+    deepEquals(veggies, ["corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"], "should not be mutated");
+
+    var to_sort = [5, 3, 4, 1, 12];
+    yield ytf("sort", [NaN, "numeric"], null);
+    yield ytf("sort", [to_sort], [1, 12, 3, 4, 5]);
+    yield ytf("sort", [to_sort, action], [1, 12, 3, 4, 5]);
+    yield ytf("sort", [to_sort, "default"], [1, 12, 3, 4, 5]);
+    yield ytf("sort", [to_sort, "reverse"], [5, 4, 3, 12, 1]);
+    yield ytf("sort", [to_sort, "numeric"], [1, 3, 4, 5, 12]);
+    yield ytf("sort", [to_sort, "ciremun"], [12, 5, 4, 3, 1]);
+    yield ytf("sort", [to_sort, function(a, b){
+        return a < b ? -1 : (a === b ? 0 : 1);
+    }], [1, 3, 4, 5, 12]);
+    deepEquals(to_sort, [5, 3, 4, 1, 12], "should not be mutated");
+
+    tf("delete", [obj, ["foo", "bar", 10]], {
+        "colors": "many",
+        "pi": [3, 1, 4, 1, 5, 9, 3],
+        "foo": {"bar": {}}//or "foo": {} ???
+    });
+    assertObjNotMutated();
+    tf("delete", [{"0": void 0}, "1"], {"0": null});
+
+    tf("encode", [{blah: 1}], "{\"blah\":1}");
+    tf("encode", [[1, 2]], "[1,2]");
+    tf("encode", [12], "12");
+    tf("encode", ["12"], "\"12\"");
+    //all nulls are treated the same
+    tf("encode", [null], "null");
+    tf("encode", [NaN], "null");
+    tf("encode", [void 0], "null");
+    //use .as("String") rules for other types
+    tf("encode", [action], "\"[Action]\"");
+    tf("encode", [/a/ig], "\"re#a#gi\"");
+    (function(){
+        tf("encode", [arguments], "{\"0\":\"a\",\"1\":\"b\"}");
+    }("a", "b"));
+    //testing it nested
+    tf("encode", [{fn: _.noop, n: NaN, u: void 0}], "{\"fn\":\"[Function]\",\"n\":null,\"u\":null}");
+
+    //testing indent options
+    tf("encode", [{a: 1, b: 2}, 0], "{\"a\":1,\"b\":2}");
+    tf("encode", [{a: 1, b: 2}, 4], "{\n    \"a\": 1,\n    \"b\": 2\n}");
+    tf("encode", [{a: 1, b: 2}, "2"], "{\n  \"a\": 1,\n  \"b\": 2\n}");
+    tf("encode", [{a: 1, b: 2}, null], "{\"a\":1,\"b\":2}", "default indent to 0");
+    tf("encode", [{a: 1, b: 2}, arguments], "{\"a\":1,\"b\":2}", "default indent to 0");
+    tf("encode", [{a: 1, b: 2}, _.noop], "{\"a\":1,\"b\":2}", "default indent to 0");
+
+    tf("keys", [obj], ["colors", "pi", "foo"]);
+    tf("keys", [obj, ["foo", "bar"]], ["10"]);
+    assertObjNotMutated();
+    tf("keys", [["not a map"]], []);
+
+    tf("values", [obj], [
+        "many",
+        [3, 1, 4, 1, 5, 9, 3],
+        {"bar": {"10": "I like cheese"}}
+    ]);
+    tf("values", [obj, ["foo", "bar"]], ["I like cheese"]);
+    assertObjNotMutated();
+    tf("values", [["not a map"]], []);
+
+    tf("put", [{key: 5}, {foo: "bar"}], {key: 5, foo: "bar"});
+    tf("put", [{key: 5}, [], {foo: "bar"}], {key: 5, foo: "bar"});
+    tf("put", [{key: 5}, ["baz"], {foo: "bar"}], {key: 5, baz: {foo: "bar"}});
+    tf("put", [{key: 5}, ["qux"], "wat?"], {key: 5, qux: "wat?"});
+    tf("put", [{key: 5}, [null], "wat?"], {key: 5, "null": "wat?"});
+    tf("put", [{key: 5}, [void 0], "wat?"], {key: 5, "null": "wat?"});
+    tf("put", [{key: 5}, [void 0], "wat?"], {key: 5, "null": "wat?"});
+    tf("put", [{key: 5}, [NaN], "wat?"], {key: 5, "null": "wat?"});
+    tf("put", [{key: 5}, [_.noop], "wat?"], {key: 5, "[Function]": "wat?"});
+
+    tf("put", [obj, ["foo"], {baz: "qux"}], {
+        "colors": "many",
+        "pi": [3, 1, 4, 1, 5, 9, 3],
+        "foo": {"baz": "qux"},
+    }, "overwrite at the path, even if to_set and curr val are both maps");
+    tf("put", [obj, ["foo", "bar", 11], "wat?"], {
+        "colors": "many",
+        "pi": [3, 1, 4, 1, 5, 9, 3],
+        "foo": {
+            "bar": {
+                "10": "I like cheese",
+                "11": "wat?",
+            },
+        }
+    });
+    tf("put", [obj, ["foo", "bar", 10], "no cheese"], {
+        "colors": "many",
+        "pi": [3, 1, 4, 1, 5, 9, 3],
+        "foo": {
+            "bar": {"10": "no cheese"},
+        }
+    });
+    tf("put", [obj, {flop: 12}], {
+        "colors": "many",
+        "pi": [3, 1, 4, 1, 5, 9, 3],
+        "foo": {"bar": {"10": "I like cheese"}},
+        "flop": 12
+    });
+    assertObjNotMutated();
+    tf("put", [{}, ["key1"], "value2"], {key1: "value2"});
+    tf("put", [{}, [], {key2: "value3"}], {key2: "value3"});
+    tf("put", [{key: 5}, "foo", {key2: "value3"}], {key: 5, "foo": {key2: "value3"}});
+    tf("put", [{key: 5}, "key", 7], {key: 7});
+    tf("put", [{key: 5}, ["key"], 9], {key: 9});
+
+    tf("put", [5, ["key"], 9], 5, "if val is not a Map or Array, return the val");
+    tf("put", ["wat", ["key"], 9], "wat", "if val is not a Map or Array, return the val");
+    tf("put", [null, ["key"], 9], null, "if val is not a Map or Array, return the val");
+    tf("put", [{a: NaN, b:void 0}], {a: null, b: null}, "if no arguments, return the val (with the correct nulls)");
+
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, {}, ["0", "0"], "foo")),
+        "{\"0\":{\"0\":\"foo\"}}",
+        "don't use arrays by default, i.e. don't do {\"0\":[\"foo\"]}"
+    );
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, {}, [0, 1], "foo")),
+        "{\"0\":{\"1\":\"foo\"}}",
+        "don't do {\"0\":[null,\"foo\"]}"
+    );
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, [], [0, 0], "foo")),
+        "[{\"0\":\"foo\"}]"
+    );
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, [["wat?"]], [0, 0], "foo")),
+        "[[\"foo\"]]",
+        "if the nested value is an array, keep it an array"
+    );
+
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, {}, ["a", "b"], [])),
+        "{\"a\":{\"b\":[]}}",
+        "preserve type of to_set"
+    );
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, [], [0], ["foo"])),
+        "[[\"foo\"]]",
+        "preserve type of to_set"
+    );
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, [], [], ["foo"])),
+        "[\"foo\"]",
+        "preserve type of to_set"
+    );
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, {}, "foo", [0])),
+        "{\"foo\":[0]}",
+        "preserve type of to_set"
+    );
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, {}, "foo", ["bar"])),
+        "{\"foo\":[\"bar\"]}",
+        "preserve type of to_set"
+    );
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, [{foo: 1}, {bar: 2}], [1, "bar", "baz"], 4)),
+        "[{\"foo\":1},{\"bar\":{\"baz\":4}}]"
+    );
+
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, {one: [2, 3]}, ["one", 1], 4)),
+        "{\"one\":[2,4]}",
+        "number index"
+    );
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, {one: [2, 3]}, ["one", "1"], 4)),
+        "{\"one\":[2,4]}",
+        "Array index can be a string"
+    );
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, {one: [2, 3]}, ["one", "2"], 4)),
+        "{\"one\":[2,3,4]}",
+        "Array index at the end"
+    );
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, {one: [2, 3]}, ["one", "3"], 4)),
+        "{\"one\":{\"0\":2,\"1\":3,\"3\":4}}",
+        "convert Array to Map if sparse array is attempted"
+    );
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, {one: [2, 3]}, ["one", "foo"], 4)),
+        "{\"one\":{\"0\":2,\"1\":3,\"foo\":4}}",
+        "convert Array to Map if non-index path is given"
+    );
+    t.equals(
+        JSON.stringify(stdlib["put"](defaultCTX, {one: [2, 3]}, ["one", "foo", "0"], 4)),
+        "{\"one\":{\"0\":2,\"1\":3,\"foo\":{\"0\":4}}}",
+        "convert Array to Map if non-index path is given"
+    );
+
+    tf("get", [obj, ["foo", "bar", "10"]], "I like cheese");
+    tf("get", [obj, "colors"], "many");
+    assertObjNotMutated();
+
+    tf("set", [obj, ["foo", "baz"], "qux"], {
+        "colors": "many",
+        "pi": [3, 1, 4, 1, 5, 9, 3],
+        "foo": {
+            "bar": {"10": "I like cheese"},
+            "baz": "qux"
+        }
+    });
+    tf("set", [obj, "flop", 12], {
+        "colors": "many",
+        "pi": [3, 1, 4, 1, 5, 9, 3],
+        "foo": {
+            "bar": {"10": "I like cheese"}
+        },
+        "flop": 12
+    });
+    tf("set", [obj, "colors", ["R", "G", "B"]], {
+        "colors": ["R", "G", "B"],
+        "pi": [3, 1, 4, 1, 5, 9, 3],
+        "foo": {
+            "bar": {"10": "I like cheese"}
+        }
+    });
+    tf("set", [obj, ["foo", "bar", "10"], "modified a sub object"], {
+        "colors": "many",
+        "pi": [3, 1, 4, 1, 5, 9, 3],
+        "foo": {
+            "bar": {"10": "modified a sub object"}
+        }
+    });
+    assertObjNotMutated();
+
+    tf("intersection", [[[2], 2, 1, NaN], [[2], "1", 2, void 0]], [[2], 2, null]);
+    tf("intersection", [[[0], {}], [[1], []]], []);
+    tf("intersection", [[]], []);
+    tf("intersection", [[{}]], []);
+    tf("intersection", [{}, [{}]], [{}]);
+
+    tf("union", [[2], [1, 2]], [2, 1]);
+    tf("union", [[1, 2], [1, 4]], [1, 2, 4]);
+    tf("union", [[{"x":2}], [{"x":1}]], [{"x":2}, {"x":1}]);
+    tf("union", [[]], []);
+    tf("union", [[], {"x":1}], [{"x":1}]);
+    tf("union", [{"x":1}, []], [{"x":1}]);
+    tf("union", [{"x":1}], {"x":1});
+
+    tf("difference", [[2, 1], [2, 3]], [1]);
+    tf("difference", [[2, 1], 2], [1]);
+    tf("difference", [[{"x":2}, {"x":1}], [{"x":2}, {"x":3}]], [{"x":1}]);
+    tf("difference", [{"x":NaN}, []], [{"x":null}]);
+    tf("difference", [{"x":NaN}], {"x":null});
+
+    tf("has", [[1, 2, 3, 4], [4, 2]], true);
+    tf("has", [[1, 2, 3, 4], [4, 5]], false);
+    tf("has", [[[null, [action]]], [[void 0, [action]]]], true);
+    tf("has", [[], []], true);
+    tf("has", [[]], true);
+
+    tf("once", [[1, 2, 1, 3, 4, 4]], [2, 3]);
+    tf("once", [{"a":void 0}], {"a":null});
+
+    tf("duplicates", [[1, 2, 1, 3, 4, 4]], [1, 4]);
+    tf("duplicates", [{"0":1, "1":1}], []);
+
+    tf("unique", [[1, 2, 1, [3], [4], [4]]], [1, 2, [3], [4]]);
+    tf("unique", [{"0":1, "1":1}], {"0":1, "1":1});
 });
 
-//test("klog", function(t){
-//    t.plan(4);
-//    var val = 42;
-//    t.equals(stdlib.klog({
-//        emit: function(kind, obj){
-//            t.equals(kind, "klog");
-//            t.equals(obj.val, 42);
-//            t.equals(obj.message, "message 1");
-//        }
-//    }, val, "message 1"), val);
-//});
-//
-//test("defaultsTo - testing debug logging", function(t){
-//
-//    var messages = [];
-//
-//    var ctx = {
-//        emit: function(kind, message){
-//            t.equals(kind, "debug");
-//
-//            messages.push(message);
-//        }
-//    };
-//
-//    t.equals(stdlib.defaultsTo(ctx, null, 42), 42, "no message to log");
-//    t.equals(stdlib.defaultsTo(ctx, null, NaN, "message 1"), null, "should emit debug");
-//    t.equals(stdlib.defaultsTo(ctx, null, 42, _.noop), 42, "message should use KRL toString rules");
-//    t.equals(stdlib.defaultsTo(ctx, null, 42, NaN), 42, "no message to log");
-//    deepEqual(t, stdlib.defaultsTo(ctx, [void 0]), [null]);
-//    testFnErr(t, "defaultsTo", [null], "Error");
-//
-//    deepEquals(t, messages, [
-//        "[DEFAULTSTO] message 1",
-//        "[DEFAULTSTO] [Function]",//message should use KRL toString rules
-//    ]);
-//
-//    t.end();
-//});
+test("klog", function(t){
+    t.plan(4);
+    var val = 42;
+    t.equals(stdlib.klog({
+        emit: function(kind, obj){
+            t.equals(kind, "klog");
+            t.equals(obj.val, 42);
+            t.equals(obj.message, "message 1");
+        }
+    }, val, "message 1"), val);
+});
+
+test("defaultsTo - testing debug logging", function(t){
+
+    var messages = [];
+
+    var ctx = {
+        emit: function(kind, message){
+            t.equals(kind, "debug");
+
+            messages.push(message);
+        }
+    };
+
+    t.equals(stdlib.defaultsTo(ctx, null, 42), 42, "no message to log");
+    t.equals(stdlib.defaultsTo(ctx, null, NaN, "message 1"), null, "should emit debug");
+    t.equals(stdlib.defaultsTo(ctx, null, 42, _.noop), 42, "message should use KRL toString rules");
+    t.equals(stdlib.defaultsTo(ctx, null, 42, NaN), 42, "no message to log");
+    deepEqual(t, stdlib.defaultsTo(ctx, [void 0]), [null]);
+    testFnErr(t, "defaultsTo", [null], "Error");
+
+    deepEqual(t, messages, [
+        "[DEFAULTSTO] message 1",
+        "[DEFAULTSTO] [Function]",//message should use KRL toString rules
+    ]);
+
+    t.end();
+});

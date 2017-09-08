@@ -6,7 +6,6 @@
   "scripts": {
     "start": "onchange -i src/ -- npm test",
     "lint": "eslint src/ && echo lint-ok",
-    "xtest": "node src/tests.js | faucet",
     "test": "npm run lint -s && node src/tests.js | faucet"
   },
   "repository": {

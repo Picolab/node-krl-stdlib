@@ -658,7 +658,7 @@ stdlib.splice = function(ctx, val, start, n_elms, value){
         throw new Error("Cannot .splice() an empty array");
     }
     if(arguments.length < 4){
-        throw new Error("The .splice() operator needs more arguments");
+        throw new Error("The .splice() operator needs more than one argument");
     }
     var startIndex = types.numericCast(start);
     if(startIndex === null){
@@ -905,7 +905,7 @@ stdlib.unique = function(ctx, val){
     if(!types.isArray(val)){
         return val;
     }
-    return _.uniq(val);
+    return _.uniqWith(val, _.isEqual);
 };
 
 stdlib["get"] = function(ctx, obj, path){
