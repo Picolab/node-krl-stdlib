@@ -391,6 +391,9 @@ test("string operators", function(t){
     tf("extract", ["This is a string", /(boot)/], []);
     tf("extract", ["I like cheese", /like (\w+)/], ["cheese"]);
     tf("extract", ["I like cheese", /(e)/g], ["e", "e", "e", "e"]);
+    tf("extract", ["I like cheese", "(ch.*)"], ["cheese"], "convert strings to RegExp");
+    tf("extract", ["what the null?", /null/], []);
+    tf("extract", ["what the null?", void 0], []);
 
     tf("lc", ["UppER"], "upper");
 

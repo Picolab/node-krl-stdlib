@@ -317,7 +317,9 @@ stdlib.extract = function(ctx, val, regex){
         return [];
     }
     val = types.toString(val);
-    regex = types.cleanNulls(regex);
+    if(!types.isRegExp(regex)){
+        regex = new RegExp(types.toString(regex));
+    }
     var r = val.match(regex);
     if(!r){
         return [];
