@@ -36,7 +36,7 @@ var iterBase = function*(val, iter){
 // some guidelines/suggestions:
 // 0. effectively check arguments.length when not fixed by the grammar (and consider null versus omitted)
 // 1. convert NaN's/void 0's when needed (i.e. use cleanNulls)
-// 2. don't mutate deep (array/map) arguments (cleanNulls doesn't, assignment can't)
+// 2. don't mutate arguments (array/map)
 // 3. where strings/numbers/arrays are expected, convert to them when reasonable (don't coerce arrays to maps)
 // 4. prioritize errors on val's type (if applicable), then argument values/types/0. from left to right
 // 5. try to return the logical noop value (e.g. false, [], val (unchanged by 3.)) for missing or unrecoverably wrongly typed arguments
@@ -73,12 +73,10 @@ stdlib[">="] = function(ctx, left, right){
     return ltEqGt(left, right) >= 0;
 };
 stdlib["=="] = function(ctx, left, right){
-    left = types.cleanNulls(left);
-    right = types.cleanNulls(right);
-    return _.isEqual(left, right);
+    return types.isEqual(left, right);
 };
 stdlib["!="] = function(ctx, left, right){
-    return !stdlib["=="](ctx, left, right);
+    return ! types.isEqual(left, right);
 };
 
 stdlib["+"] = function(ctx, left, right){
@@ -273,7 +271,7 @@ stdlib.defaultsTo = function(ctx, val, defaultVal, message){
     if(!types.isNull(message)){
         ctx.emit("debug", "[DEFAULTSTO] " + types.toString(message));
     }
-    return types.cleanNulls(defaultVal);
+    return defaultVal;
 };
 
 //Number operators//////////////////////////////////////////////////////////////
@@ -495,12 +493,10 @@ stdlib.index = function(ctx, val, elm){
     if(arguments.length < 3){
         return -1;
     }
-    val = types.cleanNulls(val);
-    elm = types.cleanNulls(elm);
     if(!types.isArray(val)){
         val = [val];
     }
-    return _.findIndex(val, _.partial(_.isEqual, elm));
+    return _.findIndex(val, _.partial(types.isEqual, elm));
 };
 stdlib.join = function(ctx, val, str){
     if(!types.isArray(val)){
@@ -686,10 +682,10 @@ stdlib.sort = (function(){
         arr[j] = temp;
     };
     return function*(ctx, val, sort_by){
-        val = _.cloneDeep(val);
         if(!types.isArray(val)){
             return val;
         }
+        val = _.cloneDeep(val);
         var sorters = {
             "default": function(a, b){
                 return stdlib.cmp(ctx, a, b);
@@ -818,43 +814,37 @@ stdlib.intersection = function(ctx, a, b){
     if(arguments.length < 3){
         return [];
     }
-    a = types.cleanNulls(a);
     if(!types.isArray(a)){
         a = [a];
     }
-    b = types.cleanNulls(b);
     if(!types.isArray(b)){
         b = [b];
     }
-    return _.intersectionWith(a, b, _.isEqual);
+    return _.intersectionWith(a, b, types.isEqual);
 };
 stdlib.union = function(ctx, a, b){
-    a = types.cleanNulls(a);
     if(arguments.length < 3){
         return a;
     }
     if(!types.isArray(a)){
         a = [a];
     }
-    b = types.cleanNulls(b);
     if(!types.isArray(b)){
         b = [b];
     }
-    return _.unionWith(a, b, _.isEqual);
+    return _.unionWith(a, b, types.isEqual);
 };
 stdlib.difference = function(ctx, a, b){
-    a = types.cleanNulls(a);
     if(arguments.length < 3){
         return a;
     }
     if(!types.isArray(a)){
         a = [a];
     }
-    b = types.cleanNulls(b);
     if(!types.isArray(b)){
         b = [b];
     }
-    return _.differenceWith(a, b, _.isEqual);
+    return _.differenceWith(a, b, types.isEqual);
 };
 stdlib.has = function(ctx, val, other){
     if(arguments.length < 3){
@@ -893,11 +883,10 @@ stdlib.duplicates = function(ctx, val){
 };
 
 stdlib.unique = function(ctx, val){
-    val = types.cleanNulls(val);
     if(!types.isArray(val)){
         return val;
     }
-    return _.uniqWith(val, _.isEqual);
+    return _.uniqWith(val, types.isEqual);
 };
 
 stdlib["get"] = function(ctx, obj, path){
@@ -909,13 +898,12 @@ stdlib["get"] = function(ctx, obj, path){
 };
 
 stdlib["set"] = function(ctx, obj, path, val){
-    obj = types.cleanNulls(obj);
     if(!types.isMap(obj)){
         return obj;
     }
     path = toKeyPath(path);
-    val = types.cleanNulls(val);
     //TODO optimize
+    obj = _.cloneDeep(obj);
     return _.set(obj, path, val);
 };
 

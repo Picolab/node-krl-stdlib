@@ -897,8 +897,8 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     tf("difference", [[2, 1], [2, 3]], [1]);
     tf("difference", [[2, 1], 2], [1]);
     tf("difference", [[{"x":2}, {"x":1}], [{"x":2}, {"x":3}]], [{"x":1}]);
-    tf("difference", [{"x":NaN}, []], [{"x":null}]);
-    tf("difference", [{"x":NaN}], {"x":null});
+    tf("difference", [{"x":null}, []], [{"x":null}]);
+    tf("difference", [{"x":null}], {"x":null});
 
     tf("has", [[1, 2, 3, 4], [4, 2]], true);
     tf("has", [[1, 2, 3, 4], [4, 5]], false);
@@ -941,7 +941,7 @@ test("defaultsTo - testing debug logging", function(t){
     };
 
     t.equals(stdlib.defaultsTo(ctx, null, 42), 42, "no message to log");
-    t.equals(stdlib.defaultsTo(ctx, null, NaN, "message 1"), null, "should emit debug");
+    t.ok(_.isNaN(stdlib.defaultsTo(ctx, null, NaN, "message 1")), "should emit debug");
     t.equals(stdlib.defaultsTo(ctx, null, 42, _.noop), 42, "message should use KRL toString rules");
     t.equals(stdlib.defaultsTo(ctx, null, 42, NaN), 42, "no message to log");
     t.deepEqual(stdlib.defaultsTo(ctx, [void 0]), [void 0]);

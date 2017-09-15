@@ -147,4 +147,10 @@ types.encode = function(val, indent){
     }, indent);
 };
 
+types.isEqual = function(left, right){
+    left = types.cleanNulls(left);
+    right = types.cleanNulls(right);
+    return _.isEqual(left, right);
+};
+
 module.exports = types;
