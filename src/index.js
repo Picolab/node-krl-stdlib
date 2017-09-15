@@ -793,7 +793,7 @@ stdlib.encode = function(ctx, val, indent){
     return types.encode(val, indent);
 };
 stdlib.keys = function(ctx, val, path){
-    if(!types.isMap(val)){
+    if(!types.isArrayOrMap(val)){
         return [];
     }
     if(path){
@@ -803,7 +803,7 @@ stdlib.keys = function(ctx, val, path){
     return _.keys(val);
 };
 stdlib.values = function(ctx, val, path){
-    if(!types.isMap(val)){
+    if(!types.isArrayOrMap(val)){
         return [];
     }
     if(path){
@@ -892,7 +892,7 @@ stdlib.unique = function(ctx, val){
 };
 
 stdlib["get"] = function(ctx, obj, path){
-    if(!types.isMap(obj)){
+    if(!types.isArrayOrMap(obj)){
         return null;
     }
     path = toKeyPath(path);
@@ -900,7 +900,7 @@ stdlib["get"] = function(ctx, obj, path){
 };
 
 stdlib["set"] = function(ctx, obj, path, val){
-    if(!types.isMap(obj)){
+    if(!types.isArrayOrMap(obj)){
         return obj;
     }
     path = toKeyPath(path);

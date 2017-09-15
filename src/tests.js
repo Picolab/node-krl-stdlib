@@ -672,7 +672,7 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     tf("delete", [obj, ["foo", "bar", 10]], {
         "colors": "many",
         "pi": [3, 1, 4, 1, 5, 9, 3],
-        "foo": {"bar": {}}//or "foo": {} ???
+        "foo": {"bar": {}}
     });
     assertObjNotMutated();
     tf("delete", [{"0": void 0}, "1"], {"0": void 0});
@@ -704,8 +704,13 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
 
     tf("keys", [obj], ["colors", "pi", "foo"]);
     tf("keys", [obj, ["foo", "bar"]], ["10"]);
+    tf("keys", [obj, ["pi"]], ["0", "1", "2", "3", "4", "5", "6"]);
+    tf("keys", [obj, ["foo", "not"]], [], "bad path");
     assertObjNotMutated();
-    tf("keys", [["not a map"]], []);
+    tf("keys", [["wat", {da: "heck"}]], ["0", "1"]);
+    tf("keys", [null], [], "not a map or array");
+    tf("keys", [_.noop], [], "not a map or array");
+    tf("keys", [{a: "b"}, "not-found"], [], "bad path");
 
     tf("values", [obj], [
         "many",
@@ -713,8 +718,12 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
         {"bar": {"10": "I like cheese"}}
     ]);
     tf("values", [obj, ["foo", "bar"]], ["I like cheese"]);
+    tf("values", [obj, ["pi"]], [3, 1, 4, 1, 5, 9, 3]);
+    tf("values", [obj, ["foo", "not"]], []);
     assertObjNotMutated();
-    tf("values", [["not a map"]], []);
+    tf("values", [["an", "array"]], ["an", "array"]);
+    tf("values", [void 0], [], "not a map or array");
+    tf("values", [_.noop], [], "not a map or array");
 
     tf("put", [{key: 5}, {foo: "bar"}], {key: 5, foo: "bar"});
     tf("put", [{key: 5}, [], {foo: "bar"}], {key: 5, foo: "bar"});
@@ -849,7 +858,10 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
 
     tf("get", [obj, ["foo", "bar", "10"]], "I like cheese");
     tf("get", [obj, "colors"], "many");
+    tf("get", [obj, ["pi", 2]], 4);
     assertObjNotMutated();
+    tf("get", [["a", "b", {"c": ["d", "e"]}], [2, "c", 1]], "e", "get works on arrays and objects equally");
+    tf("get", [["a", "b", {"c": ["d", "e"]}], ["2", "c", "1"]], "e", "array indices can be strings");
 
     tf("set", [obj, ["foo", "baz"], "qux"], {
         "colors": "many",
@@ -881,7 +893,16 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
             "bar": {"10": "modified a sub object"}
         }
     });
+    tf("set", [obj, ["pi", 4, "a"], "wat?"], {
+        "colors": "many",
+        "pi": [3, 1, 4, 1, {a: "wat?"}, 9, 3],
+        "foo": {"bar": {"10": "I like cheese"}}
+    });
     assertObjNotMutated();
+
+    tf("set", [["a", "b", "c"], [1], "wat?"], ["a", "wat?", "c"]);
+    tf("set", [["a", "b", "c"], ["1"], "wat?"], ["a", "wat?", "c"]);
+    tf("set", [[{a: [{b: 1}]}], [0, "a", 0, "b"], "wat?"], [{a: [{b: "wat?"}]}]);
 
     tf("intersection", [[[2], 2, 1, null], [[2], "1", 2, void 0]], [[2], 2, null]);
     tf("intersection", [[[0], {}], [[1], []]], []);
