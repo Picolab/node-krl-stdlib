@@ -504,6 +504,7 @@ stdlib.join = function(ctx, val, str){
     if(!types.isArray(val)){
         return val;
     }
+    val = types.cleanNulls(val);
     if(arguments.length < 3){
         return _.join(val, ",");
     }
@@ -862,6 +863,7 @@ stdlib.once = function(ctx, val){
         return val;
     }
     //TODO optimize
+    val = types.cleanNulls(val);
     var r = [];
     _.each(_.groupBy(val), function(group){
         if(group.length === 1){
@@ -875,6 +877,7 @@ stdlib.duplicates = function(ctx, val){
         return [];
     }
     //TODO optimize
+    val = types.cleanNulls(val);
     var r = [];
     _.each(_.groupBy(val), function(group){
         if(group.length > 1){
