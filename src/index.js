@@ -502,9 +502,9 @@ stdlib.index = function(ctx, val, elm){
 };
 stdlib.join = function(ctx, val, str){
     if(!types.isArray(val)){
-        return val;
+        return types.toString(val);
     }
-    val = types.cleanNulls(val);
+    val = _.map(val, types.toString);
     if(arguments.length < 3){
         return _.join(val, ",");
     }

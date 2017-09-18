@@ -569,7 +569,8 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     tf("join", [a, ";"], "3;4;5");
     tf("join", [a], "3,4,5", "default to ,");
     t.deepEquals(a, [3, 4, 5], "should not be mutated");
-    tf("join", [b], null);
+    tf("join", [b], "null");
+    tf("join", [NaN], "null");
     tf("join", [c, action], "");
     t.deepEquals(c, [], "should not be mutated");
     tf("join", [["<", ">"], /|/], "<re#|#>");
