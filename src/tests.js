@@ -933,9 +933,11 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
 
     tf("once", [[1, 2, 1, 3, 4, 4]], [2, 3]);
     tf("once", [{"a": void 0}], {"a": void 0});
+    tf("once", [[1, NaN, "a"]], [1, null, "a"]);
 
     tf("duplicates", [[1, 2, 1, 3, 4, 4]], [1, 4]);
     tf("duplicates", [{"0":1, "1":1}], []);
+    tf("duplicates", [[1, 3, null, NaN, void 0, 3]], [3, null]);
 
     tf("unique", [[1, 2, 1, [3], [4], [4]]], [1, 2, [3], [4]]);
     tf("unique", [{"0":1, "1":1}], {"0":1, "1":1});
