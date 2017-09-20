@@ -4,6 +4,16 @@ var test = require("tape");
 var types = require("./types");
 var stdlib = require("./");
 
+//t.deepEqual(s) has better error messages,		
+//but it confuses [] and {} (https://github.com/substack/tape/issues/186)
+var strictDeepEquals = function(t, actual, expected, message){
+    t.ok(_.isEqual(actual, expected), message || "should be equivalent");
+};
+
+var useStrict = function(expected){
+    return _.isEqual(expected, []) || _.isEqual(expected, {});
+};
+
 var ylibFn = function(fn_name, args){
     args = [defaultCTX].concat(args);
     var fn = stdlib[fn_name];
@@ -57,7 +67,12 @@ var testFn = function(t, fn, args, expected, emitType, errType, message){
 
     args = mkClosure(args);
     var emitCTX = mkCtx(emitType, errType);
-    t.deepEqual(stdlib[fn].apply(null, [emitCTX].concat(args)), expected, message);
+
+    if(useStrict(expected)){
+        strictDeepEquals(t, stdlib[fn].apply(null, [emitCTX].concat(args)), expected, message);
+    }else{
+        t.deepEqual(stdlib[fn].apply(null, [emitCTX].concat(args)), expected, message);
+    }
 };
 
 var testFnErr = function(t, fn, args, type, message){
@@ -115,11 +130,19 @@ var mkTfMap = function(args){
 var mkTf = function(t){
     return function*(fn, args, expected, message){
         args = mkTfMap(args);
-        t.deepEqual(
-            yield ylibFn(fn, args),
-            expected,
-            message
-        );
+        if(useStrict(expected)){
+            strictDeepEquals(t,
+                yield ylibFn(fn, args),
+                expected,
+                message
+            );
+        }else{
+            t.deepEqual(
+                yield ylibFn(fn, args),
+                expected,
+                message
+            );
+        }
     };
 };
 
@@ -503,7 +526,7 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
         ["any",    false, false],
         ["none",    true,  true],
     ]);
-    t.deepEquals(c, [], "should not be mutated");
+    strictDeepEquals(t, c, [], "should not be mutated");
 
     tf("append", [["a", "b"], ["c", "a"]], ["a", "b", "c", "a"]);
     tf("append", [["a", "b"], 10, 11], ["a", "b", 10, 11]);
@@ -516,7 +539,7 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     tf("append", [c, []], []);
     tf("append", [c], []);
     tf("append", [c, [[]]], [[]]);
-    t.deepEquals(c, [], "should not be mutated");
+    strictDeepEquals(t, c, [], "should not be mutated");
 
     var collectFn = function(a){
         return stdlib["<"]({}, a, 5) ? "x" : "y";
@@ -537,7 +560,7 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     t.deepEquals(a, [3, 4, 5], "should not be mutated");
     yield ytf("filter", [b, function(x){return stdlib.isnull({}, x);}], [null]);
     yield ytf("filter", [c, fnDontCall], []);
-    t.deepEquals(c, [], "should not be mutated");
+    strictDeepEquals(t, c, [], "should not be mutated");
     yield ytf("filter", [obj2, function(v, k){return v < 3;}], {"a":1,"b":2});
     yield ytf("filter", [obj2, function(v, k){return k === "b";}], {"b":2});
     assertObjNotMutated();
@@ -572,7 +595,7 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     tf("join", [b], "null");
     tf("join", [NaN], "null");
     tf("join", [c, action], "");
-    t.deepEquals(c, [], "should not be mutated");
+    strictDeepEquals(t, c, [], "should not be mutated");
     tf("join", [["<", ">"], /|/], "<re#|#>");
 
     tf("length", [a], 3);
@@ -588,7 +611,7 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     yield ytf("map", [action, action], action);
     t.ok(types.isAction(action), "should not be mutated");
     yield ytf("map", [c, fnDontCall], []);
-    t.deepEquals(c, [], "should not be mutated");
+    strictDeepEquals(t, c, [], "should not be mutated");
     yield ytf("map", ["012", function(x){return x + "1";}], ["0121"], "KRL strings are not arrays");
 
     yield ytf("map", [{}, fnDontCall], {});
