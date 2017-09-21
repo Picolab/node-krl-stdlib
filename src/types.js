@@ -29,12 +29,8 @@ types.isArray = function(val){
 types.isMap = function(val){
     //Can't use _.isPlainObject b/c it's to restrictive on what is a "plain" object
     //especially when accepting values from other libraries outside of KRL
-    return _.isObject(val)
+    return types.isArrayOrMap(val)
         && !_.isArray(val)
-        && !_.isFunction(val)
-        && !_.isRegExp(val)
-        && !_.isString(val)
-        && !_.isNumber(val)
     ;
 };
 
@@ -149,6 +145,12 @@ types.encode = function(val, indent){
         }
         return v;
     }, indent);
+};
+
+types.isEqual = function(left, right){
+    left = types.cleanNulls(left);
+    right = types.cleanNulls(right);
+    return _.isEqual(left, right);
 };
 
 module.exports = types;

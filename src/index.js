@@ -35,8 +35,8 @@ var iterBase = function*(val, iter){
 
 // some guidelines/suggestions:
 // 0. effectively check arguments.length when not fixed by the grammar (and consider null versus omitted)
-// 1. convert NaN's/void 0's to nulls (if cleanNulls could possibly have an effect) for all return values and other relevant values
-// 2. don't mutate deep (array/map) arguments (cleanNulls doesn't, assignment can't)
+// 1. convert NaN's/void 0's when needed (i.e. use cleanNulls)
+// 2. don't mutate arguments (array/map)
 // 3. where strings/numbers/arrays are expected, convert to them when reasonable (don't coerce arrays to maps)
 // 4. prioritize errors on val's type (if applicable), then argument values/types/0. from left to right
 // 5. try to return the logical noop value (e.g. false, [], val (unchanged by 3.)) for missing or unrecoverably wrongly typed arguments
@@ -73,17 +73,15 @@ stdlib[">="] = function(ctx, left, right){
     return ltEqGt(left, right) >= 0;
 };
 stdlib["=="] = function(ctx, left, right){
-    left = types.cleanNulls(left);
-    right = types.cleanNulls(right);
-    return _.isEqual(left, right);
+    return types.isEqual(left, right);
 };
 stdlib["!="] = function(ctx, left, right){
-    return !stdlib["=="](ctx, left, right);
+    return ! types.isEqual(left, right);
 };
 
 stdlib["+"] = function(ctx, left, right){
     if(arguments.length < 3){
-        return types.cleanNulls(left);
+        return left;
     }
     //if we have two "numbers" then do plus
     if(types.isNumber(left) && types.isNumber(right)){
@@ -98,7 +96,7 @@ stdlib["-"] = function(ctx, left, right){
         if(leftNumber === null){
             throw new TypeError("Cannot negate " + types.toString(left));
         }
-        return -types.cleanNulls(leftNumber);
+        return -leftNumber;
     }
     var rightNumber = types.numericCast(right);
     if(leftNumber === null || rightNumber === null){
@@ -184,7 +182,7 @@ stdlib.beesting = function(ctx, val){
 //
 stdlib.as = function(ctx, val, type){
     if(arguments.length < 3){
-        return types.cleanNulls(val);
+        return val;
     }
     var val_type = types.typeOf(val);
     if(val_type === type){
@@ -228,11 +226,10 @@ stdlib.isnull = function(ctx, val){
 };
 
 stdlib.klog = function(ctx, val, message){
-    val = types.cleanNulls(val);
     if(arguments.length < 3){
         ctx.emit("klog", {val: val});
     }else{
-        ctx.emit("klog", {val: val, message: types.cleanNulls(message)});
+        ctx.emit("klog", {val: val, message: types.toString(message)});
     }
     return val;
 };
@@ -243,7 +240,7 @@ stdlib["typeof"] = function(ctx, val){
 
 var format = function(val, template, specifier){
     return _.join(
-        _.map(types.toString(template).split(/\\\\/g), function(v){
+        _.map(template.split(/\\\\/g), function(v){
             return v.replace(new RegExp("(^|[^\\\\])" + specifier, "g"), "$1" + val + "");
         }),
         "\\"
@@ -254,7 +251,7 @@ stdlib.sprintf = function(ctx, val, template){
     if(arguments.length < 3){
         return "";
     }
-    template = types.cleanNulls(template);
+    template = types.toString(template);
     if(types.isNumber(val)){
         return format(val, template, "%d");
     }
@@ -266,13 +263,15 @@ stdlib.sprintf = function(ctx, val, template){
 
 stdlib.defaultsTo = function(ctx, val, defaultVal, message){
     if(!types.isNull(val)){
-        return types.cleanNulls(val); // not important whether defaultVal is missing
+        return val; // not important whether defaultVal is missing
     }
     if(arguments.length < 3){
         throw new Error("The .defaultsTo() operator needs a default value");
     }
-    if(!types.isNull(message)) ctx.emit("debug", "[DEFAULTSTO] " + types.toString(message));
-    return types.cleanNulls(defaultVal);
+    if(!types.isNull(message)){
+        ctx.emit("debug", "[DEFAULTSTO] " + types.toString(message));
+    }
+    return defaultVal;
 };
 
 //Number operators//////////////////////////////////////////////////////////////
@@ -305,7 +304,7 @@ stdlib.capitalize = function(ctx, val){
 };
 stdlib.decode = function(ctx, val){
     if(!types.isString(val)){
-        return types.cleanNulls(val);
+        return val;
     }
     try{
         return JSON.parse(val);
@@ -318,7 +317,9 @@ stdlib.extract = function(ctx, val, regex){
         return [];
     }
     val = types.toString(val);
-    regex = types.cleanNulls(regex);
+    if(!types.isRegExp(regex)){
+        regex = new RegExp(types.toString(regex));
+    }
     var r = val.match(regex);
     if(!r){
         return [];
@@ -347,7 +348,7 @@ stdlib.ord = function(ctx, val){
 };
 stdlib.replace = function(ctx, val, regex, replacement){
     if(arguments.length < 3){
-        return types.cleanNulls(val);
+        return val;
     }
     val = types.toString(val);
     if(!types.isString(regex) && !types.isRegExp(regex)){
@@ -360,13 +361,15 @@ stdlib.replace = function(ctx, val, regex, replacement){
 };
 stdlib.split = function(ctx, val, split_on){
     val = types.toString(val);
-    split_on = types.cleanNulls(split_on); // toString?
+    if( ! types.isRegExp(split_on)){
+        split_on = types.toString(split_on);
+    }
     return val.split(split_on);
 };
 stdlib.substr = function(ctx, val, start, len){
     start = types.numericCast(start);
     if(start === null){
-        return types.cleanNulls(val);
+        return val;
     }
     val = types.toString(val);
     if(start > val.length){
@@ -391,7 +394,6 @@ stdlib.uc = function(ctx, val){
 //Collection operators//////////////////////////////////////////////////////////
 //operators using KRL functions are generators to be async-friendly (co library)
 stdlib.all = function*(ctx, val, iter){
-    val = types.cleanNulls(val);
     if(!types.isArray(val)){
         val = [val];
     }
@@ -416,7 +418,6 @@ stdlib.any = function*(ctx, val, iter){
     if(!types.isFunction(iter)){
         return false;
     }
-    val = types.cleanNulls(val);
     if(!types.isArray(val)){
         val = [val];
     }
@@ -435,14 +436,13 @@ stdlib.none = function*(ctx, val, iter){
     return !(yield stdlib.any(ctx, val, iter));
 };
 stdlib.append = function(ctx, val, others){
-    return _.concat.apply(void 0, types.cleanNulls(_.tail(_.toArray(arguments))));
+    return _.concat.apply(void 0, _.tail(_.toArray(arguments)));
 };
 // works for arrays (documented) and maps (undocumented)
 stdlib.collect = function*(ctx, val, iter){
     if(!types.isFunction(iter)){
         return {};
     }
-    val = types.cleanNulls(val);
     if(!types.isArrayOrMap(val)){
         val = [val];
     }
@@ -458,7 +458,6 @@ stdlib.collect = function*(ctx, val, iter){
     return grouped;
 };
 stdlib.filter = function*(ctx, val, iter){
-    val = types.cleanNulls(val);
     if(!types.isFunction(iter)){
         return val;
     }
@@ -482,32 +481,30 @@ stdlib.filter = function*(ctx, val, iter){
 };
 stdlib.head = function(ctx, val){
     if(!types.isArray(val)){
-        return types.cleanNulls(val); // head is for arrays; pretend val is a one-value array
+        return val; // head is for arrays; pretend val is a one-value array
     }
-    return types.cleanNulls(val[0]);
+    return val[0];
 };
 stdlib.tail = function(ctx, val){
     if(!types.isArray(val)){
         return [];
     }
-    return types.cleanNulls(_.tail(val));
+    return _.tail(val);
 };
 stdlib.index = function(ctx, val, elm){
     if(arguments.length < 3){
         return -1;
     }
-    val = types.cleanNulls(val);
-    elm = types.cleanNulls(elm);
     if(!types.isArray(val)){
         val = [val];
     }
-    return _.findIndex(val, _.partial(_.isEqual, elm));
+    return _.findIndex(val, _.partial(types.isEqual, elm));
 };
 stdlib.join = function(ctx, val, str){
-    val = types.cleanNulls(val);
     if(!types.isArray(val)){
-        return val;
+        return types.toString(val);
     }
+    val = _.map(val, types.toString);
     if(arguments.length < 3){
         return _.join(val, ",");
     }
@@ -521,7 +518,6 @@ stdlib.length = function(ctx, val){
     return 0; // we could check function.prototype.length
 };
 stdlib.map = function*(ctx, val, iter){
-    val = types.cleanNulls(val);
     if(!types.isFunction(iter)){
         return val;
     }
@@ -570,7 +566,7 @@ stdlib.pairwise = function*(ctx, val, iter){
     for(i = 0; i < max_len; i++){
         args2 = [];
         for(j = 0; j < val.length; j++){
-            args2.push(types.cleanNulls(val[j][i]));
+            args2.push(val[j][i]);
         }
         r.push(yield iter(ctx, args2));
     }
@@ -582,20 +578,19 @@ stdlib.reduce = function*(ctx, val, iter, dflt){
     }
     var no_default = arguments.length < 4;
     if(val.length === 0){
-        return no_default ? 0 : types.cleanNulls(dflt);
+        return no_default ? 0 : dflt;
     }
     if(!types.isFunction(iter) && (no_default || val.length > 1)){
         throw new Error("The .reduce() operator cannot use " + types.toString(iter) + " as a function");
     }
     if(val.length === 1){
-        var head = types.cleanNulls(val[0]);
+        var head = val[0];
         if(no_default){
             return head;
         }
-        return iter(ctx, [types.cleanNulls(dflt), head]);
+        return iter(ctx, [dflt, head]);
     }
-    val = types.cleanNulls(val);
-    var acc = types.cleanNulls(dflt);
+    var acc = dflt;
     var is_first = true;
     yield iterBase(val, function*(v, k, obj){
         if(is_first && no_default){
@@ -609,11 +604,10 @@ stdlib.reduce = function*(ctx, val, iter, dflt){
     return acc;
 };
 stdlib.reverse = function(ctx, val){
-    val = types.cleanNulls(val);
     if(!types.isArray(val)){
         return val;
     }
-    return _.reverse(val);
+    return _.reverse(_.cloneDeep(val));
 };
 stdlib.slice = function(ctx, val, start, end){
     if(!types.isArray(val)){
@@ -623,7 +617,7 @@ stdlib.slice = function(ctx, val, start, end){
         return null;
     }
     if(arguments.length === 2){
-        return types.cleanNulls(val);
+        return val;
     }
     var firstIndex = types.numericCast(start);
     if(firstIndex === null){
@@ -634,7 +628,7 @@ stdlib.slice = function(ctx, val, start, end){
             ctx.emit("error", new RangeError("Cannot .slice() an array of length " + val.length + " from 0 to " + firstIndex));
             return null;
         }
-        return types.cleanNulls(_.slice(val, 0, firstIndex + 1));
+        return _.slice(val, 0, firstIndex + 1);
     }
     var secondIndex = types.numericCast(end);
     if(secondIndex === null){
@@ -646,7 +640,7 @@ stdlib.slice = function(ctx, val, start, end){
         secondIndex = temp;
     }
     if(firstIndex >= 0 && secondIndex < val.length){
-        return types.cleanNulls(_.slice(val, firstIndex, secondIndex + 1));
+        return _.slice(val, firstIndex, secondIndex + 1);
     }
     ctx.emit("error", new RangeError("Cannot .slice() an array of length " + val.length + " from " + firstIndex + " to " + secondIndex));
     return null;
@@ -677,12 +671,12 @@ stdlib.splice = function(ctx, val, start, n_elms, value){
     if(n_elms_number < 0 || startIndex + n_elms_number > val.length){
         n_elms_number = val.length - startIndex;
     }
-    var part1 = types.cleanNulls(_.slice(val, 0, startIndex));
-    var part2 = types.cleanNulls(_.slice(val, startIndex + n_elms));
+    var part1 = _.slice(val, 0, startIndex);
+    var part2 = _.slice(val, startIndex + n_elms);
     if(arguments.length < 5){
         return _.concat(part1, part2);
     }
-    return _.concat(part1, types.cleanNulls(value), part2);
+    return _.concat(part1, value, part2);
 };
 stdlib.sort = (function(){
     var swap = function(arr, i, j){
@@ -691,10 +685,10 @@ stdlib.sort = (function(){
         arr[j] = temp;
     };
     return function*(ctx, val, sort_by){
-        val = types.cleanNulls(val);
         if(!types.isArray(val)){
             return val;
         }
+        val = _.cloneDeep(val);
         var sorters = {
             "default": function(a, b){
                 return stdlib.cmp(ctx, a, b);
@@ -718,6 +712,7 @@ stdlib.sort = (function(){
         var sorted = val;
         var i, j, a, b;
         var len = sorted.length;
+        //TODO optimize with a better sort algorithm
         for (i = len - 1; i >= 0; i--){
             for(j = 1; j <= i; j++){
                 a = sorted[j-1];
@@ -733,7 +728,7 @@ stdlib.sort = (function(){
 stdlib["delete"] = function(ctx, val, path){
     path = toKeyPath(path);
     //TODO optimize
-    var n_val = types.cleanNulls(val);
+    var n_val = _.cloneDeep(val);
     _.unset(n_val, path);
     return n_val;
 };
@@ -747,7 +742,6 @@ var isSafeArrayIndex = function(arr, key){
 };
 
 stdlib.put = function(ctx, val, path, to_set){
-    val = types.cleanNulls(val);
     if(!types.isArrayOrMap(val) || arguments.length < 3){
         return val;
     }
@@ -755,6 +749,7 @@ stdlib.put = function(ctx, val, path, to_set){
         to_set = path;
         path = [];
     }
+    val = _.cloneDeep(val);
     path = toKeyPath(path);
     if(_.isEmpty(path)){
         if(types.isMap(to_set)){
@@ -799,68 +794,60 @@ stdlib.encode = function(ctx, val, indent){
     return types.encode(val, indent);
 };
 stdlib.keys = function(ctx, val, path){
-    if(!types.isMap(val)){
+    if(!types.isArrayOrMap(val)){
         return [];
     }
     if(path){
-        val = types.cleanNulls(val);
         path = toKeyPath(path);
         return _.keys(_.get(val, path));
     }
     return _.keys(val);
 };
 stdlib.values = function(ctx, val, path){
-    if(!types.isMap(val)){
+    if(!types.isArrayOrMap(val)){
         return [];
     }
     if(path){
-        val = types.cleanNulls(val);
         path = toKeyPath(path);
         return _.values(_.get(val, path));
     }
-    return types.cleanNulls(_.values(val));
+    return _.values(val);
 };
 stdlib.intersection = function(ctx, a, b){
     if(arguments.length < 3){
         return [];
     }
-    a = types.cleanNulls(a);
     if(!types.isArray(a)){
         a = [a];
     }
-    b = types.cleanNulls(b);
     if(!types.isArray(b)){
         b = [b];
     }
-    return _.intersectionWith(a, b, _.isEqual);
+    return _.intersectionWith(a, b, types.isEqual);
 };
 stdlib.union = function(ctx, a, b){
-    a = types.cleanNulls(a);
     if(arguments.length < 3){
         return a;
     }
     if(!types.isArray(a)){
         a = [a];
     }
-    b = types.cleanNulls(b);
     if(!types.isArray(b)){
         b = [b];
     }
-    return _.unionWith(a, b, _.isEqual);
+    return _.unionWith(a, b, types.isEqual);
 };
 stdlib.difference = function(ctx, a, b){
-    a = types.cleanNulls(a);
     if(arguments.length < 3){
         return a;
     }
     if(!types.isArray(a)){
         a = [a];
     }
-    b = types.cleanNulls(b);
     if(!types.isArray(b)){
         b = [b];
     }
-    return _.differenceWith(a, b, _.isEqual);
+    return _.differenceWith(a, b, types.isEqual);
 };
 stdlib.has = function(ctx, val, other){
     if(arguments.length < 3){
@@ -872,11 +859,11 @@ stdlib.has = function(ctx, val, other){
     return stdlib.difference(ctx, other, val).length === 0;
 };
 stdlib.once = function(ctx, val){
-    val = types.cleanNulls(val);
     if(!types.isArray(val)){
         return val;
     }
     //TODO optimize
+    val = types.cleanNulls(val);
     var r = [];
     _.each(_.groupBy(val), function(group){
         if(group.length === 1){
@@ -890,8 +877,8 @@ stdlib.duplicates = function(ctx, val){
         return [];
     }
     //TODO optimize
-    var r = [];
     val = types.cleanNulls(val);
+    var r = [];
     _.each(_.groupBy(val), function(group){
         if(group.length > 1){
             r.push(group[0]);
@@ -901,30 +888,27 @@ stdlib.duplicates = function(ctx, val){
 };
 
 stdlib.unique = function(ctx, val){
-    val = types.cleanNulls(val);
     if(!types.isArray(val)){
         return val;
     }
-    return _.uniqWith(val, _.isEqual);
+    return _.uniqWith(val, types.isEqual);
 };
 
 stdlib["get"] = function(ctx, obj, path){
-    if(!types.isMap(obj)){
+    if(!types.isArrayOrMap(obj)){
         return null;
     }
-    obj = types.cleanNulls(obj);
     path = toKeyPath(path);
     return _.get(obj, path, null);
 };
 
 stdlib["set"] = function(ctx, obj, path, val){
-    obj = types.cleanNulls(obj);
-    if(!types.isMap(obj)){
+    if(!types.isArrayOrMap(obj)){
         return obj;
     }
     path = toKeyPath(path);
-    val = types.cleanNulls(val);
     //TODO optimize
+    obj = _.cloneDeep(obj);
     return _.set(obj, path, val);
 };
 

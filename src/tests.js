@@ -4,10 +4,14 @@ var test = require("tape");
 var types = require("./types");
 var stdlib = require("./");
 
-//can't trust t.deepEqual(s)
-//see https://github.com/substack/tape/issues/186
-var deepEqual = function(t, actual, expected, message){
+//t.deepEqual(s) has better error messages,		
+//but it confuses [] and {} (https://github.com/substack/tape/issues/186)
+var strictDeepEquals = function(t, actual, expected, message){
     t.ok(_.isEqual(actual, expected), message || "should be equivalent");
+};
+
+var useStrict = function(expected){
+    return _.isEqual(expected, []) || _.isEqual(expected, {});
 };
 
 var ylibFn = function(fn_name, args){
@@ -63,7 +67,12 @@ var testFn = function(t, fn, args, expected, emitType, errType, message){
 
     args = mkClosure(args);
     var emitCTX = mkCtx(emitType, errType);
-    deepEqual(t, stdlib[fn].apply(null, [emitCTX].concat(args)), expected, message);
+
+    if(useStrict(expected)){
+        strictDeepEquals(t, stdlib[fn].apply(null, [emitCTX].concat(args)), expected, message);
+    }else{
+        t.deepEqual(stdlib[fn].apply(null, [emitCTX].concat(args)), expected, message);
+    }
 };
 
 var testFnErr = function(t, fn, args, type, message){
@@ -121,12 +130,19 @@ var mkTfMap = function(args){
 var mkTf = function(t){
     return function*(fn, args, expected, message){
         args = mkTfMap(args);
-        deepEqual(
-            t,
-            yield ylibFn(fn, args),
-            expected,
-            message
-        );
+        if(useStrict(expected)){
+            strictDeepEquals(t,
+                yield ylibFn(fn, args),
+                expected,
+                message
+            );
+        }else{
+            t.deepEqual(
+                yield ylibFn(fn, args),
+                expected,
+                message
+            );
+        }
     };
 };
 
@@ -296,8 +312,6 @@ test("type operators", function(t){
     tf("as", ["true", "Boolean"], true);
     tf("as", ["false", "Boolean"], false);
     tf("as", [0, "Boolean"], false);
-    tf("as", [void 0], null);
-    tf("as", [[NaN, {"NaN":null}]], [null, {"NaN":null}]);
     tfe("as", ["0", "num"], "TypeError");
     tfe("as", [{}, /boolean/], "TypeError");
 
@@ -366,6 +380,7 @@ test("number operators", function(t){
     tf("sprintf", [.25, "%d = %d"], "0.25 = 0.25");
     tf("sprintf", [.25, "\\%s%d\\\\n = .25%s"], "\\%s0.25\\n = .25%s");
     tf("sprintf", [.25, "%\\d%d\\\\\\%dd\\n"], "%\\d0.25\\%dd\\n");
+    tf("sprintf", [_.noop, void 0], "null");
 
     t.end();
 });
@@ -386,8 +401,8 @@ test("string operators", function(t){
     tf("capitalize", [" l"], " l");
 
     tf("decode", ["[1,2,3]"], [1, 2, 3]);
-    tf("decode", [[1, 2, NaN]], [1, 2, null], "if not a string, return it (with the correct nulls)");
-    tf("decode", [void 0], null, "if not a string, just return it (with the correct nulls)");
+    tf("decode", [[1, 2, null]], [1, 2, null], "if not a string, return it");
+    tf("decode", [void 0], void 0, "if not a string, just return it");
     tf("decode", ["[1,2"], "[1,2", "if parse fails, just return it");
     tf("decode", ["[1 2]"], "[1 2]", "if parse fails, just return it");
 
@@ -399,6 +414,9 @@ test("string operators", function(t){
     tf("extract", ["This is a string", /(boot)/], []);
     tf("extract", ["I like cheese", /like (\w+)/], ["cheese"]);
     tf("extract", ["I like cheese", /(e)/g], ["e", "e", "e", "e"]);
+    tf("extract", ["I like cheese", "(ch.*)"], ["cheese"], "convert strings to RegExp");
+    tf("extract", ["what the null?", /null/], []);
+    tf("extract", ["what the null?", void 0], []);
 
     tf("lc", ["UppER"], "upper");
 
@@ -416,7 +434,7 @@ test("string operators", function(t){
     tf("replace", ["William W.", /W/g, "B"], "Billiam B.");
     tf("replace", ["Sa5m", 5, true], "Satruem");
     tf("replace", [[false, void 0], /(?:)/ig], "[Array]");
-    tf("replace", [[false, void 0]], [false, null]);
+    tf("replace", [[false, void 0]], [false, void 0]);
 
     tf("split", ["a;b;3;4;", /;/], ["a", "b", "3", "4", ""]);
     tf("split", ["a;b;3;4;", ""], ["a", ";", "b", ";", "3", ";", "4", ";"]);
@@ -433,8 +451,8 @@ test("string operators", function(t){
     tf("substr", ["This is a string", 16, 0], "");
     tf("substr", ["This is a string", 16, -1], "g");
     tf("substr", ["This is a string", 25], null);
-    tf("substr", [["Not a string", NaN]], ["Not a string", null]);
-    tf("substr", [void 0, "Not an index", 2], null);
+    tf("substr", [["Not a string", void 0]], ["Not a string", void 0]);
+    tf("substr", [void 0, "Not an index", 2], void 0);
 
     tf("uc", ["loWer"], "LOWER");
 
@@ -442,10 +460,9 @@ test("string operators", function(t){
 });
 
 ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
-    var deepEquals = _.partial(deepEqual, t);
 
     var a = [3, 4, 5];
-    var b = void 0;
+    var b = null;
     var c = [];
 
     var obj = {
@@ -455,12 +472,12 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     };
     var obj2 = {"a": 1, "b": 2, "c": 3};
     var assertObjNotMutated = function(){
-        deepEquals(obj, {
+        t.deepEquals(obj, {
             "colors": "many",
             "pi": [3, 1, 4, 1, 5, 9, 3],
             "foo": {"bar": {"10": "I like cheese"}}
         }, "should not be mutated");
-        deepEquals(obj2, {"a": 1, "b": 2, "c": 3}, "should not be mutated");
+        t.deepEquals(obj2, {"a": 1, "b": 2, "c": 3}, "should not be mutated");
     };
 
     var fnDontCall = function(){
@@ -488,7 +505,7 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
         ["any",     true,  true, false, false],
         ["none",   false, false,  true,  true],
     ]);
-    deepEquals(a, [3, 4, 5], "should not be mutated");
+    t.deepEquals(a, [3, 4, 5], "should not be mutated");
 
     yield ytfm(b, [
         function(x){return stdlib.isnull({}, x);}, // 1
@@ -509,20 +526,20 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
         ["any",    false, false],
         ["none",    true,  true],
     ]);
-    deepEquals(c, [], "should not be mutated");
+    strictDeepEquals(t, c, [], "should not be mutated");
 
     tf("append", [["a", "b"], ["c", "a"]], ["a", "b", "c", "a"]);
     tf("append", [["a", "b"], 10, 11], ["a", "b", 10, 11]);
     tf("append", [10, 11], [10, 11]);
     tf("append", [a, [6]], [3, 4, 5, 6]);
     tf("append", [a, [[]]], [3, 4, 5, []]);
-    deepEquals(a, [3, 4, 5], "should not be mutated");
+    t.deepEquals(a, [3, 4, 5], "should not be mutated");
     tf("append", [b, []], [null]);
     tf("append", [b], [null]);
     tf("append", [c, []], []);
     tf("append", [c], []);
     tf("append", [c, [[]]], [[]]);
-    deepEquals(c, [], "should not be mutated");
+    strictDeepEquals(t, c, [], "should not be mutated");
 
     var collectFn = function(a){
         return stdlib["<"]({}, a, 5) ? "x" : "y";
@@ -532,7 +549,7 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
         "x": [4,3,2,1],
         "y": [7,5,6]
     });
-    yield ytf("collect", [NaN, collectFn], {"y": [null]});
+    yield ytf("collect", [null, collectFn], {"y": [null]});
     yield ytf("collect", [[], fnDontCall], {});
     yield ytf("collect", [[7]], {});
     yield ytf("collect", [[7], action], {});
@@ -540,44 +557,45 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
 
     yield ytf("filter", [a, function(x){return x < 5;}], [3, 4]);
     yield ytf("filter", [a, function(x){return x > 5;}], []);
-    deepEquals(a, [3, 4, 5], "should not be mutated");
+    t.deepEquals(a, [3, 4, 5], "should not be mutated");
     yield ytf("filter", [b, function(x){return stdlib.isnull({}, x);}], [null]);
     yield ytf("filter", [c, fnDontCall], []);
-    deepEquals(c, [], "should not be mutated");
+    strictDeepEquals(t, c, [], "should not be mutated");
     yield ytf("filter", [obj2, function(v, k){return v < 3;}], {"a":1,"b":2});
     yield ytf("filter", [obj2, function(v, k){return k === "b";}], {"b":2});
     assertObjNotMutated();
     yield ytf("filter", [b, action], null);
 
     tf("head", [a], 3);
-    deepEquals(a, [3, 4, 5], "should not be mutated");
-    tf("head", [[NaN, {}]], null);
+    t.deepEquals(a, [3, 4, 5], "should not be mutated");
+    tf("head", [[null, {}]], null);
     tf("head", ["string"], "string");
-    tf("head", [{"0": NaN}], {"0": null});
-    tf("head", [[]], null);
+    tf("head", [{"0": null}], {"0": null});
+    tf("head", [[]], void 0);
 
     tf("tail", [a], [4, 5]);
-    deepEquals(a, [3, 4, 5], "should not be mutated");
+    t.deepEquals(a, [3, 4, 5], "should not be mutated");
     tf("tail", [obj], []);
     assertObjNotMutated();
     tf("tail", ["string"], []);
 
     tf("index", [a, 5], 2);
-    deepEquals(a, [3, 4, 5], "should not be mutated");
+    t.deepEquals(a, [3, 4, 5], "should not be mutated");
     tf("index", [b, NaN], 0);
     tf("index", [obj, "colors"], -1);
     tf("index", [obj2, 2], -1);
     assertObjNotMutated();
     tf("index", [c], -1);
-    deepEquals(c, [], "should not be mutated");
+    t.deepEquals(c, [], "should not be mutated");
     tf("index", [[[[0], 0], [0, [0]], [[0], 0], [0, [0]]], [0, [0]]], 1);
 
     tf("join", [a, ";"], "3;4;5");
     tf("join", [a], "3,4,5", "default to ,");
-    deepEquals(a, [3, 4, 5], "should not be mutated");
-    tf("join", [b], null);
+    t.deepEquals(a, [3, 4, 5], "should not be mutated");
+    tf("join", [b], "null");
+    tf("join", [NaN], "null");
     tf("join", [c, action], "");
-    deepEquals(c, [], "should not be mutated");
+    strictDeepEquals(t, c, [], "should not be mutated");
     tf("join", [["<", ">"], /|/], "<re#|#>");
 
     tf("length", [a], 3);
@@ -587,13 +605,13 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     tf("length", [function(a,b){}], 0);
 
     yield ytf("map", [a, function(x){return x + 2;}], [5, 6, 7]);
-    deepEquals(a, [3, 4, 5], "should not be mutated");
-    yield ytf("map", [[3, 4, void 0]], [3, 4, null]);
+    t.deepEquals(a, [3, 4, 5], "should not be mutated");
+    yield ytf("map", [[3, 4, void 0]], [3, 4, void 0]);
     yield ytf("map", [b, function(x){return x + "2";}], ["null2"]);
     yield ytf("map", [action, action], action);
     t.ok(types.isAction(action), "should not be mutated");
     yield ytf("map", [c, fnDontCall], []);
-    deepEquals(c, [], "should not be mutated");
+    strictDeepEquals(t, c, [], "should not be mutated");
     yield ytf("map", ["012", function(x){return x + "1";}], ["0121"], "KRL strings are not arrays");
 
     yield ytf("map", [{}, fnDontCall], {});
@@ -601,7 +619,9 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     assertObjNotMutated();
 
     yield ytf("pairwise", [[a, [6, 7, 8]], function(x, y){return x + y;}], [9, 11, 13]);
-    yield ytf("pairwise", [[a, "abcdef".split("")], function(x, y){return x + y;}], [
+    yield ytf("pairwise", [[a, "abcdef".split("")], function(x, y){
+        return stdlib["+"]({}, x, y);
+    }], [
         "3a",
         "4b",
         "5c",
@@ -609,9 +629,9 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
         "nulle",
         "nullf",
     ]);
-    deepEquals(a, [3, 4, 5], "should not be mutated");
+    t.deepEquals(a, [3, 4, 5], "should not be mutated");
     yield ytf("pairwise", [[[], []], fnDontCall], []);
-    yield ytf("pairwise", [[[], 1], function(l, r){return [l, r];}], [[null, 1]]);
+    yield ytf("pairwise", [[[], 1], function(l, r){return [l, r];}], [[void 0, 1]]);
 
     yield ytfe("pairwise", [{}, fnDontCall], "TypeError");
     yield ytfe("pairwise", [[[]], fnDontCall], "TypeError");
@@ -621,14 +641,14 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     yield ytf("reduce", [a, function(a,b){return a+b;}], 12);
     yield ytf("reduce", [a, function(a,b){return a+b;}, 10], 22);
     yield ytf("reduce", [a, function(a,b){return a-b;}], -6);
-    deepEquals(a, [3, 4, 5], "should not be mutated");
+    t.deepEquals(a, [3, 4, 5], "should not be mutated");
     yield ytf("reduce", [[], fnDontCall], 0);
-    yield ytf("reduce", [[], fnDontCall, void 0], null);
+    yield ytf("reduce", [[], fnDontCall, void 0], void 0);
     yield ytf("reduce", [76, fnDontCall], 76);
     yield ytf("reduce", [null, function(a,b){return a+b;}, "76"], "76null");
 
     tf("reverse", [a], [5, 4, 3]);
-    deepEquals(a, [3, 4, 5], "should not be mutated");
+    t.deepEquals(a, [3, 4, 5], "should not be mutated");
     tf("reverse", ["not an array"], "not an array");
 
     var veggies = ["corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"];
@@ -643,7 +663,7 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     tfe("slice", [veggies, -1, _.noop], "TypeError");
     tf("slice", [veggies, 14], null, "error", "RangeError");
     tf("slice", [veggies, 2, -1], null, "error", "RangeError");
-    deepEquals(veggies, ["corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"], "should not be mutated");
+    t.deepEquals(veggies, ["corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"], "should not be mutated");
 
     tf("splice", [veggies, 1, 4], ["corn","lettuce","sprouts"]);
     tf("splice", [veggies, 2, 0, ["corn", "tomato"]], ["corn","tomato","corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"]);
@@ -657,11 +677,11 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     tfe("splice", [void 0, -1, []], "RangeError");
     tfe("splice", [veggies, 7, []], "RangeError");
     tfe("splice", [veggies, 6, []], "TypeError");
-    tf("splice", [void 0, 0, 0, []], [null]);
-    deepEquals(veggies, ["corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"], "should not be mutated");
+    tf("splice", [void 0, 0, 0, []], [void 0]);
+    t.deepEquals(veggies, ["corn","tomato","tomato","tomato","sprouts","lettuce","sprouts"], "should not be mutated");
 
     var to_sort = [5, 3, 4, 1, 12];
-    yield ytf("sort", [NaN, "numeric"], null);
+    yield ytf("sort", [null, "numeric"], null);
     yield ytf("sort", [to_sort], [1, 12, 3, 4, 5]);
     yield ytf("sort", [to_sort, action], [1, 12, 3, 4, 5]);
     yield ytf("sort", [to_sort, "default"], [1, 12, 3, 4, 5]);
@@ -671,15 +691,15 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     yield ytf("sort", [to_sort, function(a, b){
         return a < b ? -1 : (a === b ? 0 : 1);
     }], [1, 3, 4, 5, 12]);
-    deepEquals(to_sort, [5, 3, 4, 1, 12], "should not be mutated");
+    t.deepEquals(to_sort, [5, 3, 4, 1, 12], "should not be mutated");
 
     tf("delete", [obj, ["foo", "bar", 10]], {
         "colors": "many",
         "pi": [3, 1, 4, 1, 5, 9, 3],
-        "foo": {"bar": {}}//or "foo": {} ???
+        "foo": {"bar": {}}
     });
     assertObjNotMutated();
-    tf("delete", [{"0": void 0}, "1"], {"0": null});
+    tf("delete", [{"0": void 0}, "1"], {"0": void 0});
 
     tf("encode", [{blah: 1}], "{\"blah\":1}");
     tf("encode", [[1, 2]], "[1,2]");
@@ -708,8 +728,13 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
 
     tf("keys", [obj], ["colors", "pi", "foo"]);
     tf("keys", [obj, ["foo", "bar"]], ["10"]);
+    tf("keys", [obj, ["pi"]], ["0", "1", "2", "3", "4", "5", "6"]);
+    tf("keys", [obj, ["foo", "not"]], [], "bad path");
     assertObjNotMutated();
-    tf("keys", [["not a map"]], []);
+    tf("keys", [["wat", {da: "heck"}]], ["0", "1"]);
+    tf("keys", [null], [], "not a map or array");
+    tf("keys", [_.noop], [], "not a map or array");
+    tf("keys", [{a: "b"}, "not-found"], [], "bad path");
 
     tf("values", [obj], [
         "many",
@@ -717,8 +742,12 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
         {"bar": {"10": "I like cheese"}}
     ]);
     tf("values", [obj, ["foo", "bar"]], ["I like cheese"]);
+    tf("values", [obj, ["pi"]], [3, 1, 4, 1, 5, 9, 3]);
+    tf("values", [obj, ["foo", "not"]], []);
     assertObjNotMutated();
-    tf("values", [["not a map"]], []);
+    tf("values", [["an", "array"]], ["an", "array"]);
+    tf("values", [void 0], [], "not a map or array");
+    tf("values", [_.noop], [], "not a map or array");
 
     tf("put", [{key: 5}, {foo: "bar"}], {key: 5, foo: "bar"});
     tf("put", [{key: 5}, [], {foo: "bar"}], {key: 5, foo: "bar"});
@@ -768,7 +797,7 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     tf("put", [5, ["key"], 9], 5, "if val is not a Map or Array, return the val");
     tf("put", ["wat", ["key"], 9], "wat", "if val is not a Map or Array, return the val");
     tf("put", [null, ["key"], 9], null, "if val is not a Map or Array, return the val");
-    tf("put", [{a: NaN, b:void 0}], {a: null, b: null}, "if no arguments, return the val (with the correct nulls)");
+    tf("put", [{a: null, b:void 0}], {a: null, b: void 0}, "if no arguments, return the val");
 
     t.equals(
         JSON.stringify(stdlib["put"](defaultCTX, {}, ["0", "0"], "foo")),
@@ -853,7 +882,10 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
 
     tf("get", [obj, ["foo", "bar", "10"]], "I like cheese");
     tf("get", [obj, "colors"], "many");
+    tf("get", [obj, ["pi", 2]], 4);
     assertObjNotMutated();
+    tf("get", [["a", "b", {"c": ["d", "e"]}], [2, "c", 1]], "e", "get works on arrays and objects equally");
+    tf("get", [["a", "b", {"c": ["d", "e"]}], ["2", "c", "1"]], "e", "array indices can be strings");
 
     tf("set", [obj, ["foo", "baz"], "qux"], {
         "colors": "many",
@@ -885,9 +917,18 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
             "bar": {"10": "modified a sub object"}
         }
     });
+    tf("set", [obj, ["pi", 4, "a"], "wat?"], {
+        "colors": "many",
+        "pi": [3, 1, 4, 1, {a: "wat?"}, 9, 3],
+        "foo": {"bar": {"10": "I like cheese"}}
+    });
     assertObjNotMutated();
 
-    tf("intersection", [[[2], 2, 1, NaN], [[2], "1", 2, void 0]], [[2], 2, null]);
+    tf("set", [["a", "b", "c"], [1], "wat?"], ["a", "wat?", "c"]);
+    tf("set", [["a", "b", "c"], ["1"], "wat?"], ["a", "wat?", "c"]);
+    tf("set", [[{a: [{b: 1}]}], [0, "a", 0, "b"], "wat?"], [{a: [{b: "wat?"}]}]);
+
+    tf("intersection", [[[2], 2, 1, null], [[2], "1", 2, void 0]], [[2], 2, null]);
     tf("intersection", [[[0], {}], [[1], []]], []);
     tf("intersection", [[]], []);
     tf("intersection", [[{}]], []);
@@ -904,8 +945,8 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     tf("difference", [[2, 1], [2, 3]], [1]);
     tf("difference", [[2, 1], 2], [1]);
     tf("difference", [[{"x":2}, {"x":1}], [{"x":2}, {"x":3}]], [{"x":1}]);
-    tf("difference", [{"x":NaN}, []], [{"x":null}]);
-    tf("difference", [{"x":NaN}], {"x":null});
+    tf("difference", [{"x":null}, []], [{"x":null}]);
+    tf("difference", [{"x":null}], {"x":null});
 
     tf("has", [[1, 2, 3, 4], [4, 2]], true);
     tf("has", [[1, 2, 3, 4], [4, 5]], false);
@@ -914,10 +955,12 @@ ytest("collection operators", function*(t, ytfm, ytfe, ytf, tfe, tf){
     tf("has", [[]], true);
 
     tf("once", [[1, 2, 1, 3, 4, 4]], [2, 3]);
-    tf("once", [{"a":void 0}], {"a":null});
+    tf("once", [{"a": void 0}], {"a": void 0});
+    tf("once", [[1, NaN, "a"]], [1, null, "a"]);
 
     tf("duplicates", [[1, 2, 1, 3, 4, 4]], [1, 4]);
     tf("duplicates", [{"0":1, "1":1}], []);
+    tf("duplicates", [[1, 3, null, NaN, void 0, 3]], [3, null]);
 
     tf("unique", [[1, 2, 1, [3], [4], [4]]], [1, 2, [3], [4]]);
     tf("unique", [{"0":1, "1":1}], {"0":1, "1":1});
@@ -948,13 +991,13 @@ test("defaultsTo - testing debug logging", function(t){
     };
 
     t.equals(stdlib.defaultsTo(ctx, null, 42), 42, "no message to log");
-    t.equals(stdlib.defaultsTo(ctx, null, NaN, "message 1"), null, "should emit debug");
+    t.ok(_.isNaN(stdlib.defaultsTo(ctx, null, NaN, "message 1")), "should emit debug");
     t.equals(stdlib.defaultsTo(ctx, null, 42, _.noop), 42, "message should use KRL toString rules");
     t.equals(stdlib.defaultsTo(ctx, null, 42, NaN), 42, "no message to log");
-    deepEqual(t, stdlib.defaultsTo(ctx, [void 0]), [null]);
+    t.deepEqual(stdlib.defaultsTo(ctx, [void 0]), [void 0]);
     testFnErr(t, "defaultsTo", [null], "Error");
 
-    deepEqual(t, messages, [
+    t.deepEqual(messages, [
         "[DEFAULTSTO] message 1",
         "[DEFAULTSTO] [Function]",//message should use KRL toString rules
     ]);
